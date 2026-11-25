@@ -525,6 +525,50 @@ export function drawPlate(ctx, plate, time = 0) {
 
 export function drawPlatedRecipe(ctx, recipeId) {
   switch (recipeId) {
+    case 'garlic_shrimp':
+    case 'surf_and_turf': {
+      ctx.fillStyle = 'rgba(232, 92, 52, 0.45)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      ctx.scale(0.84, 0.84);
+      drawPreparedIngredient(ctx, 'seared_steak');
+      ctx.translate(4, -3);
+      drawPreparedIngredient(ctx, 'minced_herbs');
+      ctx.restore();
+      break;
+    }
+    case 'mushroom_pasta': {
+      ctx.save();
+      ctx.scale(0.88, 0.88);
+      drawPreparedIngredient(ctx, 'simmered_pasta');
+      ctx.fillStyle = '#8c5e3c';
+      ctx.beginPath();
+      ctx.arc(-5, -2, 5, 0, Math.PI * 2);
+      ctx.arc(6, 2, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fdf9ee';
+      ctx.beginPath();
+      ctx.arc(1, -2, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      break;
+    }
+    case 'chicken_flatbread': {
+      ctx.save();
+      ctx.scale(0.88, 0.88);
+      drawPreparedIngredient(ctx, 'toasted_flatbread');
+      ctx.fillStyle = '#c97b38';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 11, 7, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f2b01e';
+      ctx.fillRect(-6, -5, 5, 5);
+      ctx.fillRect(3, 2, 5, 5);
+      ctx.restore();
+      break;
+    }
     case 'burrata_flatbread': {
       ctx.save();
       ctx.scale(0.88, 0.88);

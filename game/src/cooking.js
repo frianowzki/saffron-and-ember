@@ -12,6 +12,7 @@ import {
 } from './config.js';
 import {
   INGREDIENTS,
+  STORAGE_CATALOG,
   canAddToPlate,
   getPreparedKey,
   matchRecipe,
@@ -154,6 +155,41 @@ export function interactWithStation(state, station) {
     return false;
   }
 
+  // Smart Storage Appliances (Fridge, Freezer, Pantry): open 4-item picker, or smart-grab on second Space!
+  if (station.type === 'fridge' || station.type === 'freezer' || station.type === 'pantry') {
+    const items = STORAGE_CATALOG[station.storageKind] ?? [];
+    if (!held) {
+      if (state.storagePicker && state.storagePicker.station === station) {
+        // Second Space press instantly grabs the smart-recommended item!
+        const smartId = pickSmartIngredient(state, items);
+        chef.holding = { kind: 'raw', id: smartId };
+        state.storagePicker = null;
+        audio.playPickup();
+        return true;
+      }
+      state.storagePicker = {
+        station,
+        kind: station.storageKind,
+        label: station.label,
+        items,
+        recommended: pickSmartIngredient(state, items),
+      };
+      audio.playPickup();
+      return true;
+    }
+    // Convenience: if holding a plate at Pantry, add Saffron or Cheese directly if compatible
+    if (held.kind === 'plate' && station.type === 'pantry') {
+      for (const id of ['cheese', 'saffron']) {
+        if (tryCombineOntoPlate(held, { kind: 'raw', id })) {
+          audio.playPlateClink();
+          addFloatingText(particles, pos.x, pos.y - 20, `+${INGREDIENTS[id].short}`, '#ffd24c', 14);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   // Ingredient crate
   if (station.type === 'crate') {
     if (!held) {
@@ -237,9 +273,10 @@ export function interactWithStation(state, station) {
     return false;
   }
 
-  // Charcoal Skillet / Grill
-  if (station.type === 'grill') {
-    if (!station.item && held && held.kind === 'raw' && INGREDIENTS[held.id]?.prep === 'grill') {
+  // Charcoal Skillet / Grill & Brick Wood-Fired Oven
+  if (station.type === 'grill' || station.type === 'oven') {
+    const expectedPrep = station.type === 'oven' ? 'oven' : 'grill';
+    if (!station.item && held && held.kind === 'raw' && INGREDIENTS[held.id]?.prep === expectedPrep) {
       station.item = held;
       station.cookTime = 0;
       station.perfect = false;
@@ -469,8 +506,8 @@ export function updateCookingStations(state, dt) {
       chef.chopAnim = 0.16;
     }
 
-    // Active grill searing + realistic grease fire if left burning too long
-    if (st.type === 'grill' && st.item) {
+    // Active grill searing & brick oven baking + realistic grease fire if left burning too long
+    if ((st.type === 'grill' || st.type === 'oven') && st.item) {
       st.cookTime += dt * (st.cookTime < SEAR_PERFECT_START ? cookMult : 1);
       if (st.cookTime >= SEAR_BURN_TIME && !st.burnt) {
         st.burnt = true;
@@ -516,6 +553,27 @@ export function updateCookingStations(state, dt) {
       addSteam(particles, pos.x, pos.y - 16, 'rgba(255, 252, 236, 0.42)');
     }
   }
+}
+
+export function selectStorageItem(state, index) {
+  if (!state.storagePicker) return false;
+  const id = state.storagePicker.items[index];
+  if (!id || state.chef.holding) return false;
+  state.chef.holding = { kind: 'raw', id };
+  state.storagePicker = null;
+  state.audio.playPickup();
+  return true;
+}
+
+function pickSmartIngredient(state, items) {
+  const urgent = state.orders.orders[0];
+  if (urgent) {
+    for (const id of items) {
+      const res = INGREDIENTS[id]?.result;
+      if (urgent.recipe.ingredients.includes(res)) return id;
+    }
+  }
+  return items[0];
 }
 
 export function throwHeldItem(state) {

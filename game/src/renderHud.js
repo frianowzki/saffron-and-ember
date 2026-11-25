@@ -42,6 +42,9 @@ export function renderHud(ctx, state, time) {
     if (state.showGuide && state.mode === 'playing') {
       drawContextualHintBar(ctx, state);
     }
+    if (state.storagePicker && state.mode === 'playing') {
+      drawStoragePickerOverlay(ctx, state);
+    }
     if (state.showRecipeBook && state.mode === 'playing') {
       drawQuickRecipeCard(ctx, state);
     }
@@ -735,6 +738,18 @@ function drawWorldOverlays3D(ctx, state, time) {
       const p = proj(st.col, st.row, 0.72);
       const ing = INGREDIENTS[st.ingredientId];
       drawWorldPill(ctx, p.x, p.y + 18, ing?.short ?? st.label, 'rgba(32, 20, 12, 0.84)', '#f7f1e1');
+    } else if (st.type === 'fridge') {
+      const p = proj(st.col, st.row, 1.5);
+      drawWorldPill(ctx, p.x, p.y, 'FRIDGE (Veggies)', '#2b6cb0', '#ffffff');
+    } else if (st.type === 'freezer') {
+      const p = proj(st.col, st.row, 1.32);
+      drawWorldPill(ctx, p.x, p.y, 'FREEZER (Meats)', '#2c7a99', '#ffffff');
+    } else if (st.type === 'pantry') {
+      const p = proj(st.col, st.row, 1.48);
+      drawWorldPill(ctx, p.x, p.y, 'PANTRY (Dry)', '#8c5319', '#fff5e0');
+    } else if (st.type === 'oven') {
+      const p = proj(st.col, st.row, 1.62);
+      drawWorldPill(ctx, p.x, p.y, 'BRICK OVEN', '#a83c19', '#fff5e0');
     } else if (st.type === 'pass') {
       const p = proj(st.col, st.row, 1.02);
       const ready = state.chef.holding?.kind === 'plate' && state.chef.holding?.recipeId;
@@ -763,7 +778,7 @@ function drawWorldOverlays3D(ctx, state, time) {
     if (st.type === 'chop' && st.item && st.item.kind === 'raw' && st.progress > 0) {
       const p = proj(st.col, st.row, 1.48);
       drawWorldBar(ctx, p.x, p.y, Math.min(1, st.progress / CHOP_DURATION), '#46b868', null);
-    } else if (st.type === 'grill' && st.item) {
+    } else if ((st.type === 'grill' || st.type === 'oven') && st.item) {
       const p = proj(st.col, st.row, 1.48);
       if (st.burnt) {
         drawWorldPill(ctx, p.x, p.y, 'BURNT', '#c93226', '#ffffff');
@@ -895,6 +910,59 @@ function drawTopRightSupplyBar(ctx, state) {
   ctx.font = '700 10.5px "Segoe UI", system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(state.bot?.enabled ? `${botInfo.label} [1-4]` : 'AI Bot: OFF [B]', bx + 68, y + 22);
+  ctx.restore();
+}
+
+function drawStoragePickerOverlay(ctx, state) {
+  const picker = state.storagePicker;
+  if (!picker) return;
+  const w = 420;
+  const h = 114;
+  const x = (CANVAS_W - w) / 2;
+  const y = 116;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = '#faf4e6';
+  ctx.strokeStyle = '#c49541';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowColor = 'transparent';
+
+  ctx.fillStyle = '#261a12';
+  ctx.font = '700 13px Georgia, serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${picker.label} — Pick [1-4] or Click (Space = Smart Grab)`, x + 14, y + 20);
+
+  picker.items.forEach((id, idx) => {
+    const ing = INGREDIENTS[id];
+    const bx = x + 12 + idx * 100;
+    const by = y + 36;
+    const isRec = id === picker.recommended;
+    state.uiButtons.push({ id: `pick_storage_${idx}`, x: bx, y: by, w: 94, h: 66 });
+
+    ctx.fillStyle = isRec ? '#fff2cc' : '#efe7d6';
+    ctx.strokeStyle = isRec ? '#d98a16' : '#cfc2aa';
+    ctx.lineWidth = isRec ? 2.2 : 1.2;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, 94, 66, 7);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = ing?.color ?? '#c95a32';
+    ctx.beginPath();
+    ctx.arc(bx + 47, by + 24, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#261a12';
+    ctx.font = '700 11px "Segoe UI", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`[${idx + 1}] ${ing?.short ?? id}`, bx + 47, by + 51);
+  });
   ctx.restore();
 }
 

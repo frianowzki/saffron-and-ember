@@ -165,6 +165,44 @@ export function buildRawMesh(group, id) {
       break;
     }
 
+    case 'mushroom': {
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.16, 10), getMat(0xe8d9c4, 0.7));
+      stem.position.y = 0.08;
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), getMat(0x8c5e3c, 0.55));
+      cap.position.y = 0.14;
+      cap.castShadow = true;
+      group.add(stem, cap);
+      break;
+    }
+
+    case 'pepper': {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.14, 0.28, 12), getMat(0xf0a818, 0.3));
+      body.position.y = 0.15;
+      body.castShadow = true;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.09, 6), getMat(0x3b8f44, 0.6));
+      stem.position.y = 0.32;
+      group.add(body, stem);
+      break;
+    }
+
+    case 'chicken': {
+      const breast = new THREE.Mesh(new THREE.SphereGeometry(0.23, 14, 10), getMat(0xebbca0, 0.5));
+      breast.scale.set(1.2, 0.65, 0.85);
+      breast.position.y = 0.11;
+      breast.castShadow = true;
+      group.add(breast);
+      break;
+    }
+
+    case 'shrimp': {
+      const curl = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.065, 8, 14, Math.PI * 1.45), getMat(0xf26d5b, 0.35));
+      curl.rotation.x = Math.PI / 2;
+      curl.position.y = 0.08;
+      curl.castShadow = true;
+      group.add(curl);
+      break;
+    }
+
     case 'cheese': {
       const ball = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), getMat(0xfdf9ee, 0.25));
       ball.scale.set(1.12, 0.72, 1.12);
@@ -278,6 +316,44 @@ export function buildPreparedMesh(group, id, isPerfect = false) {
       break;
     }
 
+    case 'sliced_mushroom': {
+      const mMat = getMat(0x9c704c, 0.6);
+      for (const [mx, mz] of [[-0.09, -0.05], [0.09, -0.04], [0, 0.08]]) {
+        const sl = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.04, 10), mMat);
+        sl.position.set(mx, 0.05, mz);
+        group.add(sl);
+      }
+      break;
+    }
+
+    case 'diced_pepper': {
+      const pMat = getMat(0xf2b01e, 0.35);
+      for (const [px, pz] of [[-0.09, -0.06], [0.08, -0.07], [0.02, 0.07], [-0.07, 0.08]]) {
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.1), pMat);
+        cube.position.set(px, 0.05, pz);
+        group.add(cube);
+      }
+      break;
+    }
+
+    case 'seared_chicken': {
+      const ch = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), getMat(0xc97b38, 0.45));
+      ch.scale.set(1.2, 0.62, 0.85);
+      ch.position.y = 0.1;
+      ch.castShadow = true;
+      group.add(ch);
+      break;
+    }
+
+    case 'seared_shrimp': {
+      const sh = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.068, 8, 14, Math.PI * 1.45), getMat(0xe8482c, 0.28));
+      sh.rotation.x = Math.PI / 2;
+      sh.position.y = 0.085;
+      sh.castShadow = true;
+      group.add(sh);
+      break;
+    }
+
     case 'simmered_pasta': {
       const mat = getMat(0xf5c542, 0.32);
       const mound = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), mat);
@@ -289,6 +365,44 @@ export function buildPreparedMesh(group, id, isPerfect = false) {
       swirl.rotation.x = Math.PI / 2;
       swirl.position.y = 0.15;
       group.add(swirl);
+      break;
+    }
+
+    case 'mushroom': {
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.16, 10), getMat(0xe8d9c4, 0.7));
+      stem.position.y = 0.08;
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), getMat(0x8c5e3c, 0.55));
+      cap.position.y = 0.14;
+      cap.castShadow = true;
+      group.add(stem, cap);
+      break;
+    }
+
+    case 'pepper': {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.14, 0.28, 12), getMat(0xf0a818, 0.3));
+      body.position.y = 0.15;
+      body.castShadow = true;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.09, 6), getMat(0x3b8f44, 0.6));
+      stem.position.y = 0.32;
+      group.add(body, stem);
+      break;
+    }
+
+    case 'chicken': {
+      const breast = new THREE.Mesh(new THREE.SphereGeometry(0.23, 14, 10), getMat(0xebbca0, 0.5));
+      breast.scale.set(1.2, 0.65, 0.85);
+      breast.position.y = 0.11;
+      breast.castShadow = true;
+      group.add(breast);
+      break;
+    }
+
+    case 'shrimp': {
+      const curl = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.065, 8, 14, Math.PI * 1.45), getMat(0xf26d5b, 0.35));
+      curl.rotation.x = Math.PI / 2;
+      curl.position.y = 0.08;
+      curl.castShadow = true;
+      group.add(curl);
       break;
     }
 

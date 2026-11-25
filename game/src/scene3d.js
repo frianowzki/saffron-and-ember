@@ -252,7 +252,7 @@ export function createKitchen3D(canvas, state) {
       if (st.item) {
         if (st.burnt) {
           displayItem = { kind: 'burnt', id: st.item.id, burnt: true };
-        } else if (st.type === 'grill' && st.item.kind === 'raw' && st.cookTime >= SEAR_PERFECT_START) {
+        } else if ((st.type === 'grill' || st.type === 'oven') && st.item.kind === 'raw' && st.cookTime >= SEAR_PERFECT_START) {
           displayItem = {
             kind: 'prepared',
             id: INGREDIENTS[st.item.id].result,
@@ -719,7 +719,87 @@ function buildStationNode(st, textures) {
   let dirtyMeshes = null;
   let extinguisherMesh = null;
 
-  if (st.type === 'crate') {
+  if (st.type === 'fridge') {
+    // Tall stainless-steel Produce Fridge with glass front & visible colorful produce shelves!
+    const steel = new THREE.MeshStandardMaterial({ color: 0xd5dfe6, roughness: 0.25, metalness: 0.72 });
+    const fridgeBody = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.38, 0.88), steel);
+    fridgeBody.position.y = 0.72;
+    fridgeBody.castShadow = true;
+    root.add(fridgeBody);
+
+    const glass = new THREE.Mesh(
+      new THREE.BoxGeometry(0.74, 0.86, 0.06),
+      new THREE.MeshBasicMaterial({ color: 0xd9f5ff, transparent: true, opacity: 0.55 }),
+    );
+    glass.position.set(0, 0.82, 0.44);
+    root.add(glass);
+
+    // Colorful produce bins glowing inside the fridge window
+    const shelfCols = [0xd93829, 0x3ba852, 0xf0a818];
+    shelfCols.forEach((col, i) => {
+      const bin = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.14, 0.06), new THREE.MeshStandardMaterial({ color: col, roughness: 0.4 }));
+      bin.position.set(0, 0.56 + i * 0.24, 0.42);
+      root.add(bin);
+    });
+  } else if (st.type === 'freezer') {
+    // Frosted ice-blue Chest Freezer for meats & seafood!
+    const frostMat = new THREE.MeshStandardMaterial({ color: 0xbad9eb, roughness: 0.3, metalness: 0.35 });
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.16, 0.92), frostMat);
+    lid.position.y = 0.96;
+    lid.castShadow = true;
+    const frostTrim = new THREE.Mesh(
+      new THREE.BoxGeometry(0.86, 0.05, 0.86),
+      new THREE.MeshBasicMaterial({ color: 0xe8f9ff }),
+    );
+    frostTrim.position.y = 1.05;
+    const handleBar = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.06, 0.42),
+      new THREE.MeshStandardMaterial({ color: 0x456073, metalness: 0.75, roughness: 0.25 }),
+    );
+    handleBar.position.set(0.34, 1.08, 0);
+    root.add(lid, frostTrim, handleBar);
+  } else if (st.type === 'pantry') {
+    // Warm Oak Artisan Pantry cabinet with dry goods & saffron jars on top!
+    const cab = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, 1.18, 0.86),
+      new THREE.MeshStandardMaterial({ map: textures.oak, roughness: 0.6 }),
+    );
+    cab.position.y = 0.62;
+    cab.castShadow = true;
+    const jar1 = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.24, 10), new THREE.MeshStandardMaterial({ color: 0xf08c18, roughness: 0.25 }));
+    jar1.position.set(-0.2, 1.32, 0);
+    const dough = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf2dfc0, roughness: 0.8 }));
+    dough.scale.set(1.1, 0.7, 1.1);
+    dough.position.set(0.18, 1.29, 0.04);
+    root.add(cab, jar1, dough);
+  } else if (st.type === 'oven') {
+    // Domed Mediterranean Brick Wood-Fired Oven with glowing hearth chamber!
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.44, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58),
+      new THREE.MeshStandardMaterial({ map: textures.brick, roughness: 0.82 }),
+    );
+    dome.position.y = 0.88;
+    dome.castShadow = true;
+    root.add(dome);
+
+    const archGlow = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 0.2, 0.1, 14, 1, false, 0, Math.PI),
+      new THREE.MeshBasicMaterial({ color: 0xff7b24 }),
+    );
+    archGlow.rotation.z = Math.PI / 2;
+    archGlow.rotation.y = Math.PI / 2;
+    archGlow.position.set(0, 0.96, -0.38);
+    root.add(archGlow);
+
+    emberMat = new THREE.MeshStandardMaterial({ color: 0xff621f, emissive: 0xff4800, emissiveIntensity: 1.2 });
+    const chimney = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.13, 0.34, 10),
+      new THREE.MeshStandardMaterial({ color: 0x3b2a22, roughness: 0.7 }),
+    );
+    chimney.position.set(0, 1.38, 0.12);
+    root.add(chimney);
+    itemSlot.position.y = 0.96;
+  } else if (st.type === 'crate') {
     const crateBox = new THREE.Mesh(
       new THREE.BoxGeometry(0.78, 0.22, 0.78),
       new THREE.MeshStandardMaterial({ map: textures.walnut, roughness: 0.85 }),

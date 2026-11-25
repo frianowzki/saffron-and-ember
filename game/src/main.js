@@ -3,7 +3,7 @@
 import { CANVAS_H, CANVAS_W, SHIFTS } from './config.js';
 import { createAudioEngine } from './audio.js';
 import { createChef, updateChef } from './chef.js';
-import { makePlate, updateCookingStations } from './cooking.js';
+import { makePlate, selectStorageItem, updateCookingStations } from './cooking.js';
 import { createInputController } from './input.js';
 import { buildStationGrid, createKitchenStations, tileToWorld } from './kitchenMap.js';
 import { createOrderManager, spawnOrder, updateOrders } from './orders.js';
@@ -46,6 +46,7 @@ const state = {
   thrownItems: [],
   showRecipeBook: false,
   showGuide: true,
+  storagePicker: null,
   assistMode: false,
   coopEnabled: false,
   bot: createBotController(),
@@ -184,6 +185,10 @@ function handleButton(id) {
     startShift(Math.min(SHIFTS.length - 1, state.selectedShiftIndex + 1));
     return;
   }
+  if (id.startsWith('pick_storage_')) {
+    selectStorageItem(state, Number(id.slice(13)));
+    return;
+  }
   if (id.startsWith('buy_')) {
     const upId = id.slice(4);
     if (buyUpgrade(state.upgrades, upId)) {
@@ -211,6 +216,7 @@ const inputController = createInputController(hudCanvas, state, {
     state.bot.mode = mode;
     audio.playPickup();
   },
+  pickStorage: (idx) => selectStorageItem(state, idx),
   toggleCoop: () => { state.coopEnabled = !state.coopEnabled; },
 });
 state.input = inputController.state;
@@ -277,7 +283,7 @@ function applyQueryPreset() {
     at(4, 6).cookTime = 3.8;
     at(5, 3).item = makePlate(['toasted_flatbread', 'diced_tomato'], false);
     at(6, 3).item = makePlate(['seared_salmon', 'saffron'], true);
-    at(11, 2).item = makePlate(['seared_steak', 'minced_herbs'], true);
+    at(11, 5).item = makePlate(['seared_steak', 'minced_herbs'], true);
     at(11, 3).dirtyCount = 2;
     at(11, 4).dirtyCount = 1;
     at(11, 4).washProgress = 0.85;

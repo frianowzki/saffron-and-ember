@@ -1,4 +1,5 @@
-// Open-flame kitchen floorplan (12x7 grid) with prep, hearth, marble island, sink, dirty return, and extinguisher.
+// Open-flame kitchen floorplan (12x7) with Fridge (produce), Freezer (meats), Pantry,
+// Wood-Fired Oven, Charcoal Skillets, Copper Pots, Maple Boards, Sink, and zero unreachable corner crates!
 
 import { GRID_COLS, GRID_ROWS, KITCHEN_ORIGIN_X, KITCHEN_ORIGIN_Y, TILE_SIZE } from './config.js';
 
@@ -24,41 +25,41 @@ export function createKitchenStations(layoutIndex = 1, extraPlates = 0) {
     });
   };
 
-  // North counter (row 0): Fresh produce crates, maple chopping boards, saffron, pasta, copper pot & clean plates
-  add(0, 0, 'crate', { ingredientId: 'tomato', label: 'Tomatoes' });
-  add(1, 0, 'crate', { ingredientId: 'herbs', label: 'Basil & Garlic' });
+  // North row (row 0): Corner (0,0) is decorative shelf — ALL interactive stations easily reachable!
+  add(0, 0, 'counter', { surface: 'oak', label: 'Spice Corner' });
+  add(1, 0, 'fridge', { label: 'Produce Fridge', storageKind: 'fridge' });
   add(2, 0, 'chop', { label: 'Maple Board' });
   add(3, 0, 'counter', { surface: 'oak', label: 'Prep Counter' });
   add(4, 0, 'chop', { label: 'Maple Board' });
-  add(5, 0, 'crate', { ingredientId: 'dough', label: 'Flatbread' });
-  add(6, 0, 'crate', { ingredientId: 'saffron', label: 'Saffron' });
-  add(7, 0, 'crate', { ingredientId: 'pasta', label: 'Pasta' });
+  add(5, 0, 'pantry', { label: 'Artisan Pantry', storageKind: 'pantry' });
+  add(6, 0, 'counter', { surface: 'oak', label: 'Dry Prep' });
+  add(7, 0, 'crate', { ingredientId: 'tomato', label: 'Fresh Tomatoes' });
   add(8, 0, 'pot', { label: 'Copper Pot' });
   add(9, 0, 'counter', { surface: 'marble', label: 'Plating Marble' });
   add(10, 0, 'plates', { label: 'Clean Plates', plateCount: 4 + extraPlates });
-  add(11, 0, 'pass', { label: 'Brass Pass' });
+  add(11, 0, 'counter', { surface: 'oak', label: 'Pass Corner' });
 
-  // East wall (col 11): Dual brass pass window, dirty plate return, ceramic wash sink & bin
+  // East wall (col 11): Dual Brass Pass Window, Staging, Dirty Return, Ceramic Wash Sink
   add(11, 1, 'pass', { label: 'Brass Pass' });
-  add(11, 2, 'counter', { surface: 'marble', label: 'Pass Staging' });
+  add(11, 2, 'pass', { label: 'Brass Pass' });
   add(11, 3, 'dirty_return', { label: 'Dirty Return' });
   add(11, 4, 'sink', { label: 'Wash Sink' });
   add(11, 5, 'counter', { surface: 'marble', label: 'Drying Rack' });
   add(11, 6, 'bin', { label: 'Compost Bin' });
 
-  // West wall (col 0): Cold larder (steak, salmon, burrata cheese), fire extinguisher & compost bin
-  add(0, 1, 'crate', { ingredientId: 'steak', label: 'Ribeye Cut' });
-  add(0, 2, 'crate', { ingredientId: 'salmon', label: 'Wild Salmon' });
-  add(0, 3, 'crate', { ingredientId: 'cheese', label: 'Fresh Burrata' });
+  // West wall (col 0): Cold Meat/Seafood Freezer, Butcher Block, Fire Extinguisher, Bin
+  add(0, 1, 'counter', { surface: 'oak', label: 'Larder Bench' });
+  add(0, 2, 'freezer', { label: 'Meat Freezer', storageKind: 'freezer' });
+  add(0, 3, 'counter', { surface: 'oak', label: 'Butcher Block' });
   add(0, 4, 'extinguisher', { label: 'Fire Extinguisher' });
   add(0, 5, 'bin', { label: 'Compost Bin' });
-  add(0, 6, 'counter', { surface: 'oak', label: 'Spice Shelf' });
+  add(0, 6, 'counter', { surface: 'oak', label: 'Herb Corner' });
 
-  // South hearth (row 6): Charcoal skillets, copper stock pot & marble garnish counters
+  // South hearth (row 6): Cast-Iron Charcoal Skillets, Brick Wood-Fired Oven, Copper Stock Pot
   add(1, 6, 'grill', { label: 'Charcoal Skillet' });
   add(2, 6, 'grill', { label: 'Charcoal Skillet' });
   add(3, 6, 'counter', { surface: 'oak', label: 'Hearth Counter' });
-  add(4, 6, 'grill', { label: 'Charcoal Skillet' });
+  add(4, 6, 'oven', { label: 'Wood-Fired Oven' });
   add(5, 6, 'counter', { surface: 'marble', label: 'Plating Marble' });
   add(6, 6, 'pot', { label: 'Copper Pot' });
   add(7, 6, 'counter', { surface: 'oak', label: 'Garnish Counter' });
@@ -66,19 +67,16 @@ export function createKitchenStations(layoutIndex = 1, extraPlates = 0) {
   add(9, 6, 'counter', { surface: 'oak', label: 'Pass Bench' });
   add(10, 6, 'counter', { surface: 'oak', label: 'Tray Bench' });
 
-  // Shift-specific central island layouts for distinct route planning!
+  // Shift-specific central marble island layouts
   if (layoutIndex === 0) {
-    // Lunch Courtyard: wide open compact 2-tile marble island
     add(5, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
     add(6, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
   } else if (layoutIndex === 2) {
-    // Grand Tasting: split dual-galley islands with center pass-through lane (ideal for Throwing!)
     add(3, 3, 'counter', { surface: 'marble', label: 'West Island' });
     add(4, 3, 'counter', { surface: 'marble', label: 'West Assembly' });
     add(7, 3, 'counter', { surface: 'marble', label: 'East Assembly' });
     add(8, 3, 'counter', { surface: 'marble', label: 'East Island' });
   } else {
-    // Twilight Hearth: classic 4-tile central marble island
     add(4, 3, 'counter', { surface: 'marble', label: 'Island Marble' });
     add(5, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
     add(6, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
@@ -117,9 +115,7 @@ export function isWalkable(grid, col, row) {
 }
 
 export function findPathToAdjacent(grid, startCol, startRow, targetCol, targetRow) {
-  const dirs = [
-    [1, 0], [-1, 0], [0, 1], [0, -1],
-  ];
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const goals = new Set();
   if (isWalkable(grid, targetCol, targetRow)) {
     goals.add(`${targetCol},${targetRow}`);
