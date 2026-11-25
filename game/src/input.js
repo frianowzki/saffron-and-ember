@@ -13,6 +13,7 @@ export function createInputController(canvas, state, callbacks) {
     interactHeld: false,
     dashPressed: false,
     discardPressed: false,
+    throwPressed: false,
   };
 
   const toCanvasCoords = (evt) => {
@@ -25,10 +26,15 @@ export function createInputController(canvas, state, callbacks) {
 
   window.addEventListener('keydown', (evt) => {
     const code = evt.code;
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(code)) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(code)) {
       evt.preventDefault();
     }
     state.audio.unlock();
+
+    if (code === 'Tab' || code === 'KeyC') {
+      if (state.mode === 'playing') callbacks.switchChef();
+      return;
+    }
 
     if (code === 'KeyP' || code === 'Escape') {
       if (state.mode === 'playing') state.mode = 'paused';
@@ -37,6 +43,14 @@ export function createInputController(canvas, state, callbacks) {
     }
     if (code === 'KeyM') {
       state.audio.toggleMute();
+      return;
+    }
+    if (code === 'KeyR') {
+      if (state.mode === 'playing') state.showRecipeBook = !state.showRecipeBook;
+      return;
+    }
+    if (code === 'KeyK') {
+      if (state.mode === 'playing') callbacks.toggleCoop();
       return;
     }
     if (state.mode === 'title' && (code === 'Enter' || code === 'Space')) {
@@ -48,6 +62,7 @@ export function createInputController(canvas, state, callbacks) {
       if (code === 'Space' || code === 'KeyE') input.interactPressed = true;
       if (code === 'ShiftLeft' || code === 'ShiftRight') input.dashPressed = true;
       if (code === 'KeyQ' || code === 'KeyX') input.discardPressed = true;
+      if (code === 'KeyF') input.throwPressed = true;
     }
     keys.add(code);
   });
@@ -62,9 +77,9 @@ export function createInputController(canvas, state, callbacks) {
     state.mouse.y = pt.y;
 
     if (state.mode === 'playing') {
-      const { col, row } = worldToTile(pt.x, pt.y);
-      if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
-        state.hoveredStation = state.grid[row][col];
+      const picked = state.scene3d ? state.scene3d.pickTileAtScreen(pt.x, pt.y) : worldToTile(pt.x, pt.y);
+      if (picked && picked.col >= 0 && picked.col < GRID_COLS && picked.row >= 0 && picked.row < GRID_ROWS) {
+        state.hoveredStation = state.grid[picked.row][picked.col];
       } else {
         state.hoveredStation = null;
       }
@@ -90,13 +105,13 @@ export function createInputController(canvas, state, callbacks) {
 
     if (state.mode !== 'playing') return;
 
-    const { col, row } = worldToTile(pt.x, pt.y);
-    if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
-      const station = state.grid[row][col];
+    const picked = state.scene3d ? state.scene3d.pickTileAtScreen(pt.x, pt.y) : worldToTile(pt.x, pt.y);
+    if (picked && picked.col >= 0 && picked.col < GRID_COLS && picked.row >= 0 && picked.row < GRID_ROWS) {
+      const station = state.grid[picked.row][picked.col];
       if (station) {
         commandChefToStation(state, station);
       } else {
-        commandChefToTile(state, col, row);
+        commandChefToTile(state, picked.col, picked.row);
       }
     }
   });
@@ -118,6 +133,7 @@ export function createInputController(canvas, state, callbacks) {
       input.interactPressed = false;
       input.dashPressed = false;
       input.discardPressed = false;
+      input.throwPressed = false;
     },
   };
 }

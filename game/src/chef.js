@@ -1,4 +1,4 @@
-// Chef movement, dash boost, keyboard + mouse click-to-path steering, and station targeting.
+// Dual-chef movement, dash boost, keyboard + mouse click-to-path steering, and station targeting.
 
 import {
   CHEF_DASH_COOLDOWN,
@@ -19,11 +19,13 @@ import {
   worldToTile,
 } from './kitchenMap.js';
 import { addFlourPuff } from './particles.js';
-import { interactWithStation } from './cooking.js';
+import { interactWithStation, throwHeldItem } from './cooking.js';
 
-export function createChef() {
-  const start = tileToWorld(5, 2);
+export function createChef(col = 5, row = 2, name = 'Marco', variant = 'marco') {
+  const start = tileToWorld(col, row);
   return {
+    name,
+    variant,
     x: start.x,
     y: start.y,
     vx: 0,
@@ -65,6 +67,15 @@ export function commandChefToTile(state, col, row) {
 export function updateChef(state, dt) {
   const { chef, input, grid, audio, particles } = state;
 
+  // Decay animations on inactive chef too
+  for (const c of state.chefs) {
+    if (c !== chef) {
+      if (c.chopAnim > 0) c.chopAnim = Math.max(0, c.chopAnim - dt);
+      if (c.dashTimer > 0) c.dashTimer = Math.max(0, c.dashTimer - dt);
+      if (c.dashCooldown > 0) c.dashCooldown = Math.max(0, c.dashCooldown - dt);
+    }
+  }
+
   if (chef.dashCooldown > 0) chef.dashCooldown = Math.max(0, chef.dashCooldown - dt);
   if (chef.dashTimer > 0) chef.dashTimer = Math.max(0, chef.dashTimer - dt);
   if (chef.chopAnim > 0) chef.chopAnim = Math.max(0, chef.chopAnim - dt);
@@ -72,7 +83,6 @@ export function updateChef(state, dt) {
   let moveX = input.moveX;
   let moveY = input.moveY;
 
-  // Manual keyboard movement cancels click-to-move path
   if (moveX !== 0 || moveY !== 0) {
     chef.path = [];
     chef.queuedStation = null;
@@ -89,7 +99,6 @@ export function updateChef(state, dt) {
       moveY = dy / dist;
     }
   } else if (chef.queuedStation) {
-    // Arrived adjacent to queued station: face it and interact
     const st = chef.queuedStation;
     const target = tileToWorld(st.col, st.row);
     const dx = target.x - chef.x;
@@ -132,7 +141,10 @@ export function updateChef(state, dt) {
   if (input.interactPressed && chef.facingStation) {
     interactWithStation(state, chef.facingStation);
   }
-  if (input.discardPressed && chef.holding) {
+  if (input.throwPressed && chef.holding) {
+    throwHeldItem(state);
+  }
+  if (input.discardPressed && chef.holding && chef.holding.kind !== 'extinguisher') {
     chef.holding = null;
     audio.playDrop();
   }
@@ -180,7 +192,6 @@ function findFacingStation(chef, grid) {
     return grid[primary.row][primary.col];
   }
 
-  // Fallback: nearest adjacent station within interaction reach
   const cur = worldToTile(chef.x, chef.y);
   let best = null;
   let bestDist = Infinity;

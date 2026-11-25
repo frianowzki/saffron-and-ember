@@ -1,8 +1,11 @@
-// Procedural Web Audio sound engine for kitchen acoustics (zero external audio files).
+// Procedural Web Audio sound & Mediterranean bistro music engine (zero external audio files).
 
 export function createAudioEngine() {
   let ctx = null;
   let muted = false;
+  let musicPlaying = false;
+  let musicStep = 0;
+  let musicTimer = 0;
 
   const ensureContext = () => {
     if (muted) return null;
@@ -56,8 +59,29 @@ export function createAudioEngine() {
     src.start();
   };
 
+  // Upbeat Mediterranean marimba & upright bass pattern (D minor / F major tarantella feel)
+  const bassNotes = [146.8, 0, 220.0, 0, 174.6, 0, 220.0, 196.0, 130.8, 0, 196.0, 0, 164.8, 0, 220.0, 0];
+  const melodyNotes = [587.3, 0, 659.3, 698.5, 587.3, 0, 523.3, 0, 523.3, 587.3, 659.3, 0, 440.0, 523.3, 587.3, 0];
+
+  const updateMusic = (dt, active, isRush) => {
+    musicPlaying = active && !muted;
+    if (!musicPlaying || !ctx || ctx.state !== 'running') return;
+    const stepInterval = isRush ? 0.19 : 0.25;
+    musicTimer += dt;
+    if (musicTimer >= stepInterval) {
+      musicTimer -= stepInterval;
+      const idx = musicStep % bassNotes.length;
+      const b = bassNotes[idx];
+      const m = melodyNotes[idx];
+      if (b > 0) playTone(b, b * 0.98, 0.2, 'triangle', 0.042);
+      if (m > 0) playTone(m, m, 0.14, 'sine', 0.032);
+      musicStep += 1;
+    }
+  };
+
   return {
     unlock: ensureContext,
+    updateMusic,
     isMuted: () => muted,
     toggleMute: () => {
       muted = !muted;

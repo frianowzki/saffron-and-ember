@@ -1,4 +1,5 @@
-// Station cooking logic: chopping, grilling (with Perfect Sear bonus window), simmering, plating, and serving.
+// Realistic kitchen mechanics: chopping, grilling (with Perfect Sear & flare-up fire hazard), simmering,
+// combinatorial plating, dirty plate return & sink washing, and fire extinguisher dousing.
 
 import {
   CHOP_DURATION,
@@ -19,12 +20,16 @@ import { tileToWorld } from './kitchenMap.js';
 import {
   addChopBurst,
   addFloatingText,
+  addFlourPuff,
   addServeCelebration,
   addSizzleSparks,
   addSteam,
   triggerShake,
 } from './particles.js';
 import { serveDishOrder } from './orders.js';
+
+const WASH_DURATION = 1.6;
+const FIRE_IGNITE_DELAY = 3.2;
 
 export function makePlate(ingredients = [], perfectSear = false) {
   const recipe = matchRecipe(ingredients);
@@ -54,9 +59,41 @@ export function interactWithStation(state, station) {
   const pos = tileToWorld(station.col, station.row);
   const held = chef.holding;
 
-  // Compost bin discards anything
+  // Douse an active pan fire!
+  if (station.onFire) {
+    const boost = held?.kind === 'extinguisher' ? 1.0 : 0.45;
+    station.fireProgress += boost;
+    addFlourPuff(particles, pos.x, pos.y - 8);
+    audio.playDash();
+    if (station.fireProgress >= 1.0) {
+      station.onFire = false;
+      station.fireProgress = 0;
+      station.item = null;
+      station.cookTime = 0;
+      station.burnt = false;
+      addFloatingText(particles, pos.x, pos.y - 24, 'Fire Out!', '#8ef5a2', 16);
+    }
+    return true;
+  }
+
+  // Fire Extinguisher station (pick up / return)
+  if (station.type === 'extinguisher') {
+    if (!held) {
+      chef.holding = { kind: 'extinguisher', id: 'extinguisher' };
+      audio.playPickup();
+      return true;
+    }
+    if (held.kind === 'extinguisher') {
+      chef.holding = null;
+      audio.playDrop();
+      return true;
+    }
+    return false;
+  }
+
+  // Compost bin discards food or burnt mess (never throws away the extinguisher)
   if (station.type === 'bin') {
-    if (held) {
+    if (held && held.kind !== 'extinguisher') {
       chef.holding = null;
       audio.playDrop();
       addFloatingText(particles, pos.x, pos.y - 16, 'Discarded', '#d8c5a8', 14);
@@ -65,18 +102,50 @@ export function interactWithStation(state, station) {
     return false;
   }
 
-  // Clean plate stack
-  if (station.type === 'plates') {
-    if (!held) {
-      chef.holding = makePlate([]);
+  // Dirty Plate Return tray
+  if (station.type === 'dirty_return') {
+    if (!held && station.dirtyCount > 0) {
+      station.dirtyCount -= 1;
+      chef.holding = { kind: 'dirty_plate', id: 'dirty_plate' };
       audio.playPlateClink();
       return true;
     }
-    // If holding a prepared ingredient, plate it immediately!
+    return false;
+  }
+
+  // Ceramic Wash Sink
+  if (station.type === 'sink') {
+    if (held?.kind === 'dirty_plate') {
+      station.dirtyCount += 1;
+      chef.holding = null;
+      audio.playPlateClink();
+      return true;
+    }
+    if (!held && station.dirtyCount > 0) {
+      advanceWash(state, station, 0.52, pos);
+      chef.chopAnim = 0.22;
+      return true;
+    }
+    return false;
+  }
+
+  // Clean plate stack (finite stack replenished by washing dirty plates!)
+  if (station.type === 'plates') {
+    if (!held) {
+      if (station.plateCount > 0) {
+        station.plateCount -= 1;
+        chef.holding = makePlate([]);
+        audio.playPlateClink();
+        return true;
+      }
+      addFloatingText(particles, pos.x, pos.y - 20, 'Wash dirty plates!', '#ff9f66', 14);
+      return false;
+    }
     const key = getPreparedKey(held);
-    if (key) {
+    if (key && station.plateCount > 0) {
       const plate = makePlate([]);
       if (tryCombineOntoPlate(plate, held)) {
+        station.plateCount -= 1;
         chef.holding = plate;
         audio.playPlateClink();
         return true;
@@ -92,7 +161,6 @@ export function interactWithStation(state, station) {
       audio.playPickup();
       return true;
     }
-    // Convenience: if holding a plate and crate is saffron (raw-plateable), add directly!
     if (held.kind === 'plate') {
       const candidate = { kind: 'raw', id: station.ingredientId };
       if (tryCombineOntoPlate(held, candidate)) {
@@ -104,22 +172,23 @@ export function interactWithStation(state, station) {
     return false;
   }
 
-  // Brass Pass Window (serve plated dish)
+  // Brass Pass Window (serve plated dish & queue dirty plate return!)
   if (station.type === 'pass') {
     if (held && held.kind === 'plate' && held.recipeId) {
       const result = serveDishOrder(orders, held.recipeId, held.perfectSear);
       if (result.matched) {
         chef.holding = null;
         station.item = null;
+        state.pendingDirtyReturns.push(4.2);
         audio.playServeBell(result.combo);
         addServeCelebration(particles, pos.x, pos.y - 12);
-        triggerShake(particles, 5, 0.16);
+        triggerShake(particles, 4.5, 0.14);
         const tag = result.perfectBonus > 0 ? ' PERFECT!' : '';
         const comboTag = result.combo > 1 ? ` x${result.combo}` : '';
         addFloatingText(
           particles,
-          pos.x - 24,
-          pos.y - 28,
+          pos.x - 16,
+          pos.y - 22,
           `+$${result.totalEarned}${tag}${comboTag}`,
           result.perfectBonus > 0 ? '#ffe066' : '#8ef5a2',
           20,
@@ -135,7 +204,6 @@ export function interactWithStation(state, station) {
 
   // Chopping board
   if (station.type === 'chop') {
-    // Active chop tap if raw choppable item is already on the board
     if (station.item && station.item.kind === 'raw' && INGREDIENTS[station.item.id]?.prep === 'chop') {
       if (!held) {
         advanceChop(station, CHOP_TAP_BOOST, pos, audio, particles);
@@ -143,7 +211,6 @@ export function interactWithStation(state, station) {
         return true;
       }
     }
-    // Place raw choppable ingredient on empty board
     if (!station.item && held && held.kind === 'raw' && INGREDIENTS[held.id]?.prep === 'chop') {
       station.item = held;
       station.progress = 0;
@@ -152,7 +219,6 @@ export function interactWithStation(state, station) {
       chef.chopAnim = 0.22;
       return true;
     }
-    // Pick up finished chopped item (or plate directly if chef holds a plate!)
     if (station.item && station.item.kind === 'prepared') {
       if (!held) {
         chef.holding = station.item;
@@ -178,6 +244,7 @@ export function interactWithStation(state, station) {
       station.cookTime = 0;
       station.perfect = false;
       station.burnt = false;
+      station.onFire = false;
       chef.holding = null;
       audio.playSizzle();
       addSizzleSparks(particles, pos.x, pos.y - 6, 6);
@@ -185,8 +252,7 @@ export function interactWithStation(state, station) {
     }
     if (station.item) {
       const done = station.cookTime >= SEAR_PERFECT_START;
-      const burnt = station.burnt;
-      if (burnt && !held) {
+      if (station.burnt && !held) {
         chef.holding = { kind: 'burnt', id: station.item.id, burnt: true };
         station.item = null;
         station.cookTime = 0;
@@ -194,7 +260,7 @@ export function interactWithStation(state, station) {
         audio.playDrop();
         return true;
       }
-      if (done && !burnt) {
+      if (done && !station.burnt) {
         const cookedItem = {
           kind: 'prepared',
           id: INGREDIENTS[station.item.id].result,
@@ -268,7 +334,7 @@ export function interactWithStation(state, station) {
     return false;
   }
 
-  // Standard oak or marble counter (supports plating & mid-assembly!)
+  // Oak or Marble counter (supports plating & mid-assembly!)
   if (station.type === 'counter') {
     if (!station.item && held) {
       station.item = held;
@@ -282,7 +348,6 @@ export function interactWithStation(state, station) {
       audio.playPickup();
       return true;
     }
-    // Combine held prepared item onto plate sitting on counter
     if (station.item && station.item.kind === 'plate' && held && held.kind !== 'plate') {
       if (tryCombineOntoPlate(station.item, held)) {
         chef.holding = null;
@@ -293,7 +358,6 @@ export function interactWithStation(state, station) {
         return true;
       }
     }
-    // Combine counter prepared item onto held plate
     if (held && held.kind === 'plate' && station.item && station.item.kind !== 'plate') {
       if (tryCombineOntoPlate(held, station.item)) {
         station.item = null;
@@ -307,6 +371,19 @@ export function interactWithStation(state, station) {
   }
 
   return false;
+}
+
+function advanceWash(state, sink, amount, pos) {
+  sink.washProgress = Math.min(WASH_DURATION, sink.washProgress + amount);
+  addSteam(state.particles, pos.x, pos.y - 10, 'rgba(185, 232, 255, 0.65)');
+  if (sink.washProgress >= WASH_DURATION) {
+    sink.washProgress = 0;
+    sink.dirtyCount = Math.max(0, sink.dirtyCount - 1);
+    const platesStation = state.stations.find((s) => s.type === 'plates');
+    if (platesStation) platesStation.plateCount += 1;
+    state.audio.playPlateClink();
+    addFloatingText(state.particles, pos.x, pos.y - 22, 'Plate Clean!', '#8ee8ff', 14);
+  }
 }
 
 export function advanceChop(station, amount, pos, audio, particles) {
@@ -328,10 +405,30 @@ export function advanceChop(station, amount, pos, audio, particles) {
 export function updateCookingStations(state, dt) {
   const { stations, chef, particles, audio } = state;
 
+  // Return dirty plates to the dirty_return tray after dishes are eaten
+  if (state.pendingDirtyReturns.length > 0) {
+    const tray = stations.find((s) => s.type === 'dirty_return');
+    for (let i = state.pendingDirtyReturns.length - 1; i >= 0; i--) {
+      state.pendingDirtyReturns[i] -= dt;
+      if (state.pendingDirtyReturns[i] <= 0) {
+        state.pendingDirtyReturns.splice(i, 1);
+        if (tray) tray.dirtyCount += 1;
+      }
+    }
+  }
+
+  // Active washing flag for faucet water stream & bubbles
+  for (const st of stations) {
+    st.isWashing = false;
+  }
+
+  // Update Overcooked-2 style thrown 3D ingredients in parabolic flight!
+  updateThrownItems(state, dt);
+
   for (const st of stations) {
     const pos = tileToWorld(st.col, st.row);
 
-    // Hold-to-chop when standing at a chopping board with a raw item
+    // Hold-to-chop on chopping board
     if (
       st.type === 'chop' &&
       st.item &&
@@ -355,15 +452,36 @@ export function updateCookingStations(state, dt) {
       }
     }
 
-    // Active grill searing
+    // Hold-to-wash at ceramic sink
+    if (
+      st.type === 'sink' &&
+      st.dirtyCount > 0 &&
+      !chef.holding &&
+      state.input.interactHeld &&
+      chef.facingStation === st
+    ) {
+      st.isWashing = true;
+      advanceWash(state, st, dt, pos);
+      chef.chopAnim = 0.16;
+    }
+
+    // Active grill searing + realistic grease fire if left burning too long
     if (st.type === 'grill' && st.item) {
       st.cookTime += dt;
       if (st.cookTime >= SEAR_BURN_TIME && !st.burnt) {
         st.burnt = true;
         addFloatingText(particles, pos.x, pos.y - 24, 'Burnt!', '#ff624d', 15);
       }
-      if (Math.random() < dt * (st.burnt ? 7 : 4.5)) {
-        if (st.burnt) {
+      if (st.burnt && !st.onFire && st.cookTime >= SEAR_BURN_TIME + FIRE_IGNITE_DELAY) {
+        st.onFire = true;
+        addFloatingText(particles, pos.x, pos.y - 28, 'PAN FIRE!', '#ff3b2f', 17);
+        audio.playOrderExpired();
+      }
+      if (Math.random() < dt * (st.onFire ? 10 : st.burnt ? 7 : 4.5)) {
+        if (st.onFire) {
+          addSizzleSparks(particles, pos.x, pos.y - 10, 4);
+          addSteam(particles, pos.x, pos.y - 14, 'rgba(38, 28, 24, 0.65)');
+        } else if (st.burnt) {
           addSteam(particles, pos.x, pos.y - 12, 'rgba(42, 34, 30, 0.55)');
         } else {
           addSizzleSparks(particles, pos.x, pos.y - 6, 2);
@@ -389,9 +507,86 @@ export function updateCookingStations(state, dt) {
       }
     }
 
-    // Gentle steam off ready plated dishes on marble counters
+    // Gentle steam off ready plated dishes
     if (st.item && st.item.kind === 'plate' && st.item.recipeId && Math.random() < dt * 2.2) {
       addSteam(particles, pos.x, pos.y - 16, 'rgba(255, 252, 236, 0.42)');
+    }
+  }
+}
+
+export function throwHeldItem(state) {
+  const { chef, audio } = state;
+  const held = chef.holding;
+  if (!held || held.kind !== 'raw') return false;
+
+  const dist = 240;
+  const startX = chef.x + chef.facingX * 18;
+  const startY = chef.y + chef.facingY * 18;
+  const targetX = startX + chef.facingX * dist;
+  const targetY = startY + chef.facingY * dist;
+
+  state.thrownItems.push({
+    item: held,
+    startX,
+    startY,
+    targetX,
+    targetY,
+    x: startX,
+    y: startY,
+    t: 0,
+    duration: 0.36,
+  });
+  chef.holding = null;
+  audio.playDash();
+  return true;
+}
+
+function updateThrownItems(state, dt) {
+  if (!state.thrownItems || state.thrownItems.length === 0) return;
+  const { grid, chefs, audio, particles } = state;
+
+  for (let i = state.thrownItems.length - 1; i >= 0; i--) {
+    const proj = state.thrownItems[i];
+    proj.t += dt / proj.duration;
+    const progress = Math.min(1, proj.t);
+    proj.x = proj.startX + (proj.targetX - proj.startX) * progress;
+    proj.y = proj.startY + (proj.targetY - proj.startY) * progress;
+
+    // Check catch by the other chef mid-flight
+    for (const c of chefs) {
+      if (!c.holding && progress > 0.25 && Math.hypot(c.x - proj.x, c.y - proj.y) < 42) {
+        c.holding = proj.item;
+        audio.playPickup();
+        addFloatingText(particles, c.x, c.y - 24, 'Caught!', '#9ef0b0', 14);
+        state.thrownItems.splice(i, 1);
+        proj.caught = true;
+        break;
+      }
+    }
+    if (proj.caught) continue;
+
+    if (progress >= 1) {
+      // Land on target station if compatible (chop, grill, pot, or empty counter)
+      const col = Math.floor((proj.x - 196) / 74);
+      const row = Math.floor((proj.y - 136) / 74);
+      const st = grid[row]?.[col] ?? null;
+      const ing = INGREDIENTS[proj.item.id];
+      if (st && !st.item && !st.onFire) {
+        if (st.type === 'counter' || (st.type === 'chop' && ing?.prep === 'chop')) {
+          st.item = proj.item;
+          st.progress = 0;
+          audio.playDrop();
+        } else if (st.type === 'grill' && ing?.prep === 'grill') {
+          st.item = proj.item;
+          st.cookTime = 0;
+          audio.playSizzle();
+        } else if (st.type === 'pot' && ing?.prep === 'pot') {
+          st.item = proj.item;
+          st.cookTime = 0;
+          audio.playDrop();
+        }
+      }
+      state.thrownItems.splice(i, 1);
     }
   }
 }

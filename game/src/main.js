@@ -1,8 +1,8 @@
-// Saffron & Ember bootstrap, fixed-timestep loop, scene management, and live gameplay showcase states.
+// Saffron & Ember 3D bootstrap, fixed-timestep loop, dual-chef management, and live preview presets.
 
 import { CANVAS_H, CANVAS_W, SHIFTS } from './config.js';
 import { createAudioEngine } from './audio.js';
-import { createChef } from './chef.js';
+import { createChef, updateChef } from './chef.js';
 import { makePlate, updateCookingStations } from './cooking.js';
 import { createInputController } from './input.js';
 import { buildStationGrid, createKitchenStations, tileToWorld } from './kitchenMap.js';
@@ -18,12 +18,16 @@ import {
 } from './particles.js';
 import { renderHud } from './renderHud.js';
 import { renderKitchen } from './renderKitchen.js';
-import { updateChef } from './chef.js';
+import { createKitchen3D } from './scene3d.js';
 
-const canvas = document.getElementById('kitchen-canvas');
-const ctx = canvas.getContext('2d');
+const sceneCanvas = document.getElementById('scene-canvas');
+const hudCanvas = document.getElementById('hud-canvas');
+const ctx = hudCanvas.getContext('2d');
 
 const audio = createAudioEngine();
+
+const initialMarco = createChef(5, 2, 'Marco', 'marco');
+const initialSofia = createChef(6, 4, 'Sofia', 'sofia');
 
 const state = {
   mode: 'title',
@@ -32,10 +36,17 @@ const state = {
   timeLeft: SHIFTS[1].durationSec,
   stations: [],
   grid: [],
-  chef: createChef(),
+  chefs: [initialMarco, initialSofia],
+  activeChefIndex: 0,
+  chef: initialMarco,
+  pendingDirtyReturns: [],
+  thrownItems: [],
+  showRecipeBook: false,
+  coopEnabled: false,
   orders: createOrderManager(SHIFTS[1]),
   particles: createParticleSystem(),
   audio,
+  scene3d: null,
   input: null,
   mouse: { x: 0, y: 0 },
   hoveredStation: null,
@@ -49,16 +60,32 @@ function setupKitchen(shiftIndex) {
   state.timeLeft = state.shift.durationSec;
   state.stations = createKitchenStations();
   state.grid = buildStationGrid(state.stations);
-  state.chef = createChef();
+  state.chefs = [
+    createChef(4, 2, 'Marco', 'marco'),
+    createChef(7, 4, 'Sofia', 'sofia'),
+  ];
+  state.activeChefIndex = 0;
+  state.chef = state.chefs[0];
+  state.pendingDirtyReturns = [];
+  state.thrownItems = [];
   state.orders = createOrderManager(state.shift);
   state.particles = createParticleSystem();
   state.hoveredStation = null;
 
-  // Populate two inviting opening orders right away
   const first = spawnOrder(state.orders, state.shift.allowedRecipes[0], false);
   const second = spawnOrder(state.orders, state.shift.allowedRecipes[1 % state.shift.allowedRecipes.length], false);
   if (first) first.slideIn = 0;
   if (second) second.slideIn = 0;
+
+  if (state.scene3d) {
+    state.scene3d.rebuildKitchen(state.stations);
+  }
+}
+
+function switchChef() {
+  state.activeChefIndex = (state.activeChefIndex + 1) % state.chefs.length;
+  state.chef = state.chefs[state.activeChefIndex];
+  audio.playPickup();
 }
 
 function startShift(shiftIndex) {
@@ -79,6 +106,15 @@ function handleButton(id) {
   if (id === 'start_shift') {
     startShift(state.selectedShiftIndex);
     audio.playServeBell(1);
+    return;
+  }
+  if (id === 'switch_chef') {
+    switchChef();
+    return;
+  }
+  if (id === 'toggle_recipes') {
+    state.showRecipeBook = !state.showRecipeBook;
+    audio.playPickup();
     return;
   }
   if (id === 'mute') {
@@ -108,12 +144,23 @@ function handleButton(id) {
   }
 }
 
-const inputController = createInputController(canvas, state, { startShift, handleButton });
+const inputController = createInputController(hudCanvas, state, {
+  startShift,
+  handleButton,
+  switchChef,
+  toggleCoop: () => { state.coopEnabled = !state.coopEnabled; },
+});
 state.input = inputController.state;
 
 setupKitchen(1);
 
-// Optional live preview presets for testing specific mid-shift states cleanly in desktop Chrome
+try {
+  state.scene3d = createKitchen3D(sceneCanvas, state);
+} catch (err) {
+  console.warn('WebGL unavailable, falling back to 2D renderer:', err);
+}
+
+// Live preview presets for testing mid-shift 3D kitchen scenes in desktop Chrome
 function applyQueryPreset() {
   const params = new URLSearchParams(window.location.search);
   const preset = params.get('preset');
@@ -122,6 +169,12 @@ function applyQueryPreset() {
   if (preset === 'title') {
     setupKitchen(1);
     state.mode = 'title';
+    const at = (c, r) => state.grid[r][c];
+    at(1, 6).item = { kind: 'raw', id: 'steak' };
+    at(1, 6).cookTime = 4.2;
+    at(5, 3).item = makePlate(['toasted_flatbread', 'diced_tomato', 'minced_herbs'], true);
+    at(8, 0).item = { kind: 'raw', id: 'pasta' };
+    at(8, 0).cookTime = 4.0;
     return;
   }
 
@@ -146,41 +199,51 @@ function applyQueryPreset() {
     state.orders.bestCombo = 4;
     state.orders.rushActive = true;
 
-    // Ingredients on counters, chopping in progress, searing steak & salmon, simmering pasta,
-    // dish mid-assembly on the marble island, and a finished plated dish ready on the brass pass!
     const at = (c, r) => state.grid[r][c];
     at(2, 0).item = { kind: 'raw', id: 'tomato' };
-    at(2, 0).progress = 0.88;
+    at(2, 0).progress = 0.92;
     at(4, 0).item = { kind: 'prepared', id: 'minced_herbs' };
     at(3, 0).item = { kind: 'prepared', id: 'diced_tomato' };
     at(8, 0).item = { kind: 'raw', id: 'pasta' };
     at(8, 0).cookTime = 4.1;
     at(1, 6).item = { kind: 'raw', id: 'steak' };
-    at(1, 6).cookTime = 4.2; // Golden Perfect Sear!
+    at(1, 6).cookTime = 4.2;
     at(2, 6).item = { kind: 'raw', id: 'salmon' };
     at(2, 6).cookTime = 2.4;
     at(4, 6).item = { kind: 'raw', id: 'dough' };
     at(4, 6).cookTime = 3.8;
-    at(5, 3).item = makePlate(['toasted_flatbread', 'diced_tomato'], false); // Dish mid-assembly!
-    at(6, 3).item = makePlate(['seared_salmon', 'saffron'], true); // Second dish mid-assembly!
-    at(11, 2).item = makePlate(['seared_steak', 'minced_herbs'], true); // Finished plated dish ready beside pass!
+    at(5, 3).item = makePlate(['toasted_flatbread', 'diced_tomato'], false);
+    at(6, 3).item = makePlate(['seared_salmon', 'saffron'], true);
+    at(11, 2).item = makePlate(['seared_steak', 'minced_herbs'], true);
+    at(11, 3).dirtyCount = 2;
+    at(11, 4).dirtyCount = 1;
+    at(11, 4).washProgress = 0.85;
+    at(11, 4).isWashing = true;
 
-    const chefPos = tileToWorld(9, 2);
-    state.chef.x = chefPos.x;
-    state.chef.y = chefPos.y;
-    state.chef.facingX = 1;
-    state.chef.facingY = 0;
-    state.chef.holding = makePlate(['toasted_flatbread', 'diced_tomato', 'minced_herbs'], true);
-    state.chef.facingStation = at(11, 1);
+    // Head Chef Marco delivering a plated Herb Bruschetta to the Brass Pass
+    const marcoPos = tileToWorld(9, 2);
+    state.chefs[0].x = marcoPos.x;
+    state.chefs[0].y = marcoPos.y;
+    state.chefs[0].facingX = 1;
+    state.chefs[0].facingY = 0;
+    state.chefs[0].holding = makePlate(['toasted_flatbread', 'diced_tomato', 'minced_herbs'], true);
+    state.chefs[0].facingStation = at(11, 1);
 
-    // Rich live particles (steam, sizzle, floating tip popup)
+    // Sous Chef Sofia chopping tomatoes at the north Maple Board!
+    const sofiaPos = tileToWorld(2, 1);
+    state.chefs[1].x = sofiaPos.x;
+    state.chefs[1].y = sofiaPos.y;
+    state.chefs[1].facingX = 0;
+    state.chefs[1].facingY = -1;
+    state.chefs[1].chopAnim = 0.18;
+
     const pSteak = tileToWorld(1, 6);
     addSizzleSparks(state.particles, pSteak.x, pSteak.y - 6, 8);
     addSteam(state.particles, pSteak.x, pSteak.y - 16);
     const pPot = tileToWorld(8, 0);
     addSteam(state.particles, pPot.x, pPot.y - 16);
     const pPass = tileToWorld(11, 1);
-    addFloatingText(state.particles, pPass.x - 42, pPass.y - 24, '+$62 PERFECT! x4', '#ffe066', 20);
+    addFloatingText(state.particles, pPass.x - 36, pPass.y - 24, '+$62 PERFECT! x4', '#ffe066', 20);
     return;
   }
 
@@ -210,18 +273,27 @@ function applyQueryPreset() {
     at(1, 6).cookTime = 4.3;
     at(2, 6).item = { kind: 'raw', id: 'steak' };
     at(2, 6).cookTime = 2.6;
+    at(4, 6).item = { kind: 'raw', id: 'dough' };
+    at(4, 6).burnt = true;
+    at(4, 6).onFire = true; // Active pan fire hazard!
     at(6, 6).item = { kind: 'raw', id: 'pasta' };
     at(6, 6).cookTime = 3.9;
     at(5, 3).item = makePlate(['simmered_pasta', 'diced_tomato', 'saffron'], false);
     at(7, 3).item = makePlate(['toasted_flatbread', 'seared_steak', 'diced_tomato'], true);
 
-    const chefPos = tileToWorld(2, 1);
-    state.chef.x = chefPos.x;
-    state.chef.y = chefPos.y;
-    state.chef.facingX = 0;
-    state.chef.facingY = -1;
-    state.chef.chopAnim = 0.18;
-    state.chef.facingStation = at(2, 0);
+    const marcoPos = tileToWorld(3, 5);
+    state.chefs[0].x = marcoPos.x;
+    state.chefs[0].y = marcoPos.y;
+    state.chefs[0].facingX = 1;
+    state.chefs[0].facingY = 0.6;
+    state.chefs[0].holding = { kind: 'extinguisher', id: 'extinguisher' };
+
+    const sofiaPos = tileToWorld(2, 1);
+    state.chefs[1].x = sofiaPos.x;
+    state.chefs[1].y = sofiaPos.y;
+    state.chefs[1].facingX = 0;
+    state.chefs[1].facingY = -1;
+    state.chefs[1].chopAnim = 0.18;
 
     const pBoard = tileToWorld(2, 0);
     addChopBurst(state.particles, pBoard.x, pBoard.y - 6, '#e63929', 10);
@@ -259,29 +331,30 @@ function tick(now) {
     updateChef(state, dt);
     updateCookingStations(state, dt);
     updateOrders(state.orders, dt, state.timeLeft, audio, state.particles);
+    audio.updateMusic(dt, true, state.orders.rushActive);
     if (state.timeLeft <= 0) {
       state.mode = 'summary';
       audio.playShiftComplete();
     }
+  } else {
+    audio.updateMusic(dt, false, false);
   }
 
   updateParticles(state.particles, dt);
 
-  // Render scene
   ctx.save();
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-  ctx.fillStyle = '#1b1410';
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  state.uiButtons = [];
 
-  if (state.particles.shakeTime > 0) {
-    const sx = (Math.random() - 0.5) * state.particles.shakePower * 2;
-    const sy = (Math.random() - 0.5) * state.particles.shakePower * 2;
-    ctx.translate(sx, sy);
+  if (state.scene3d) {
+    state.scene3d.syncState(state, state.elapsed);
+  } else {
+    ctx.fillStyle = '#1b1410';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    renderKitchen(ctx, state, state.elapsed);
+    renderParticles(ctx, state.particles);
   }
 
-  state.uiButtons = [];
-  renderKitchen(ctx, state, state.elapsed);
-  renderParticles(ctx, state.particles);
   renderHud(ctx, state, state.elapsed);
   ctx.restore();
 
