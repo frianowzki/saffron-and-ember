@@ -291,10 +291,10 @@ export function createKitchen3D(canvas, state) {
         }
       }
 
-      // Animated boiling pot bubbles & broth level
+      // Animated boiling pot bubbles & broth level (cleanly above pot interior, zero Z-fighting)
       if (node.brothMesh) {
-        node.brothMesh.position.y = 1.12 + Math.sin(time * 7 + st.col) * 0.018;
-        node.brothMesh.material.color.setHex(st.burnt ? 0x2e241f : st.item ? 0xf2ad2e : 0x6cb5c7);
+        node.brothMesh.position.y = 1.148 + Math.sin(time * 5 + st.col) * 0.005;
+        node.brothMesh.material.color.setHex(st.burnt ? 0x2e241f : st.item ? 0xf2ad2e : 0x8cd9ed);
       }
       if (node.boilBubbles) {
         const boiling = Boolean(st.item) && !st.burnt;
@@ -777,19 +777,48 @@ function buildStationNode(st, textures) {
     burnerFlames.position.y = 0.88;
     root.add(burnerFlames);
 
-    const pot = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.35, 0.32, 0.3, 20),
-      new THREE.MeshStandardMaterial({ color: 0xc96b34, roughness: 0.24, metalness: 0.76 }),
-    );
-    pot.position.y = 1.0;
+    const copperMat = new THREE.MeshStandardMaterial({ color: 0xd97a3e, roughness: 0.26, metalness: 0.72 });
+    const brassMat = new THREE.MeshStandardMaterial({ color: 0xe8bc55, roughness: 0.22, metalness: 0.85 });
+
+    // Gleaming copper pot outer body (top at y=1.12)
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.31, 0.26, 22), copperMat);
+    pot.position.y = 0.99;
     pot.castShadow = true;
     root.add(pot);
 
-    brothMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.31, 0.31, 0.04, 18),
-      new THREE.MeshStandardMaterial({ color: 0x6cb5c7, roughness: 0.18 }),
+    // Metallic brass rim (y=1.16) + two curved side loop handles
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.345, 0.025, 8, 24), brassMat);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 1.16;
+    root.add(rim);
+
+    for (const sx of [-1, 1]) {
+      const potHandle = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.02, 8, 14, Math.PI), brassMat);
+      potHandle.rotation.z = sx * (-Math.PI / 2);
+      potHandle.position.set(sx * 0.35, 1.04, 0);
+      root.add(potHandle);
+    }
+
+    // Recessed dark steel pot interior (top at y=1.132)
+    const inner = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.318, 0.30, 0.02, 20),
+      new THREE.MeshStandardMaterial({ color: 0x3b3330, roughness: 0.45, metalness: 0.55 }),
     );
-    brothMesh.position.y = 1.12;
+    inner.position.y = 1.122;
+    root.add(inner);
+
+    // Translucent simmering water / golden broth surface cleanly above interior (y=1.148)
+    brothMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.31, 0.31, 0.012, 20),
+      new THREE.MeshStandardMaterial({
+        color: 0x8cd9ed,
+        roughness: 0.12,
+        metalness: 0.1,
+        transparent: true,
+        opacity: 0.72,
+      }),
+    );
+    brothMesh.position.y = 1.148;
     root.add(brothMesh);
 
     boilBubbles = new THREE.Group();
