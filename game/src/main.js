@@ -22,6 +22,7 @@ import { createKitchen3D } from './scene3d.js';
 import { buyUpgrade, createUpgradeState, getUpgradeModifiers } from './upgrades.js';
 import { createBotController, updateBotChef } from './botAI.js';
 import { createCustomizationState, getActiveCustomization } from './customization.js';
+import { VENUES } from './venues3d.js';
 
 const sceneCanvas = document.getElementById('scene-canvas');
 const hudCanvas = document.getElementById('hud-canvas');
@@ -35,6 +36,8 @@ const initialSofia = createChef(6, 4, 'Sofia', 'sofia');
 const state = {
   mode: 'title',
   selectedShiftIndex: 1,
+  selectedVenueIndex: 0,
+  venueId: VENUES[0].id,
   shift: SHIFTS[1],
   timeLeft: SHIFTS[1].durationSec,
   stations: [],
@@ -65,8 +68,15 @@ const state = {
   elapsed: 0,
 };
 
-function setupKitchen(shiftIndex) {
+function setupKitchen(shiftIndex, venueOverride = null) {
   state.selectedShiftIndex = shiftIndex;
+  if (venueOverride) {
+    const vIdx = VENUES.findIndex((v) => v.id === venueOverride);
+    if (vIdx >= 0) {
+      state.selectedVenueIndex = vIdx;
+      state.venueId = VENUES[vIdx].id;
+    }
+  }
   state.shift = SHIFTS[shiftIndex];
   state.timeLeft = state.shift.durationSec;
   const baseMods = getUpgradeModifiers(state.upgrades);
@@ -97,8 +107,17 @@ function setupKitchen(shiftIndex) {
   if (second) second.slideIn = 0;
 
   if (state.scene3d) {
-    state.scene3d.rebuildKitchen(state.stations);
+    state.scene3d.rebuildKitchen(state.stations, state.venueId);
   }
+}
+
+function cycleVenue() {
+  state.selectedVenueIndex = (state.selectedVenueIndex + 1) % VENUES.length;
+  state.venueId = VENUES[state.selectedVenueIndex].id;
+  if (state.scene3d) {
+    state.scene3d.rebuildKitchen(state.stations, state.venueId);
+  }
+  audio.playPickup();
 }
 
 function switchChef() {
@@ -164,6 +183,10 @@ function handleButton(id) {
     audio.playPickup();
     return;
   }
+  if (id === 'cycle_venue') {
+    cycleVenue();
+    return;
+  }
   if (id === 'mute') {
     audio.toggleMute();
     return;
@@ -217,6 +240,7 @@ const inputController = createInputController(hudCanvas, state, {
     audio.playPickup();
   },
   pickStorage: (idx) => selectStorageItem(state, idx),
+  cycleVenue,
   toggleCoop: () => { state.coopEnabled = !state.coopEnabled; },
 });
 state.input = inputController.state;
@@ -233,10 +257,14 @@ try {
 function applyQueryPreset() {
   const params = new URLSearchParams(window.location.search);
   const preset = params.get('preset');
-  if (!preset) return;
+  const venueParam = params.get('venue');
+  if (!preset) {
+    if (venueParam) setupKitchen(state.selectedShiftIndex, venueParam);
+    return;
+  }
 
   if (preset === 'title') {
-    setupKitchen(1);
+    setupKitchen(1, venueParam || 'beach');
     state.mode = 'title';
     const at = (c, r) => state.grid[r][c];
     at(1, 6).item = { kind: 'raw', id: 'steak' };
@@ -248,7 +276,7 @@ function applyQueryPreset() {
   }
 
   if (preset === 'rush') {
-    setupKitchen(1);
+    setupKitchen(1, venueParam || 'beach');
     state.mode = 'playing';
     state.timeLeft = 42;
     state.orders.orders = [];
@@ -317,7 +345,7 @@ function applyQueryPreset() {
   }
 
   if (preset === 'prep') {
-    setupKitchen(2);
+    setupKitchen(2, venueParam || 'market');
     state.mode = 'playing';
     state.timeLeft = 118;
     state.orders.orders = [];
@@ -387,7 +415,7 @@ function applyQueryPreset() {
   }
 
   if (preset === 'summary') {
-    setupKitchen(1);
+    setupKitchen(1, venueParam || 'mall');
     state.mode = 'summary';
     state.timeLeft = 0;
     state.orders.score = 724;

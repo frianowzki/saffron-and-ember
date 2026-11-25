@@ -57,6 +57,10 @@ export function createInputController(canvas, state, callbacks) {
       if (state.mode === 'playing') callbacks.toggleBot();
       return;
     }
+    if (code === 'KeyV') {
+      callbacks.cycleVenue();
+      return;
+    }
     if (code === 'Digit1') { if (!callbacks.pickStorage(0)) callbacks.setBotMode('auto'); return; }
     if (code === 'Digit2') { if (!callbacks.pickStorage(1)) callbacks.setBotMode('prep'); return; }
     if (code === 'Digit3') { if (!callbacks.pickStorage(2)) callbacks.setBotMode('wash'); return; }

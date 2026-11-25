@@ -19,6 +19,7 @@ import { INGREDIENTS } from './recipes.js';
 import { buildHDChefRig } from './chef3d.js';
 import { buildFoodMesh, buildRawMesh } from './meshFood.js';
 import { createKitchenTextures } from './textures3d.js';
+import { applyVenueAtmosphere, buildVenueEnvironment, getVenueFloorMaterials } from './venues3d.js';
 
 const CELL = 1.0;
 
@@ -84,6 +85,7 @@ export function createKitchen3D(canvas, state) {
   scene.add(kitchenGroup);
 
   const stationNodes = new Map();
+  let venueAnim = { waves: [], palms: [], lanterns: [] };
   const focusRing = buildFocusRing();
   focusRing.visible = false;
   scene.add(focusRing);
@@ -120,47 +122,47 @@ export function createKitchen3D(canvas, state) {
     };
   }
 
-  function rebuildKitchen(stations) {
+  function rebuildKitchen(stations, venueId = state.venueId || 'beach') {
     while (kitchenGroup.children.length > 0) {
       kitchenGroup.remove(kitchenGroup.children[0]);
     }
     stationNodes.clear();
 
-    // Surrounding warm restaurant dining floor (so the kitchen sits in a real bistro room, not a void!)
-    const diningFloor = new THREE.Mesh(
-      new THREE.PlaneGeometry(34, 24),
-      new THREE.MeshStandardMaterial({ map: textures.walnut, roughness: 0.78 }),
-    );
-    diningFloor.rotation.x = -Math.PI / 2;
-    diningFloor.position.y = -0.35;
-    diningFloor.receiveShadow = true;
-    kitchenGroup.add(diningFloor);
+    applyVenueAtmosphere(venueId, {
+      scene,
+      hemi,
+      sun,
+      fillLight,
+      hearthLight,
+      passLight,
+      dinerCandleLight,
+    });
 
-    // Raised kitchen plinth
+    const floorMats = getVenueFloorMaterials(venueId, textures);
+
+    // Raised kitchen plinth styled per venue
     const plinth = new THREE.Mesh(
       new THREE.BoxGeometry(GRID_COLS + 0.7, 0.36, GRID_ROWS + 0.7),
-      new THREE.MeshStandardMaterial({ map: textures.walnut, roughness: 0.72 }),
+      floorMats.plinth,
     );
     plinth.position.y = -0.2;
     plinth.receiveShadow = true;
     kitchenGroup.add(plinth);
 
-    // Glazed terracotta & sage ceramic kitchen floor tiles
-    const lightTileMat = new THREE.MeshStandardMaterial({ map: textures.floorLight, roughness: 0.42 });
-    const sageTileMat = new THREE.MeshStandardMaterial({ map: textures.floorSage, roughness: 0.42 });
+    // Venue-themed kitchen floor tiles
     const tileGeo = new THREE.BoxGeometry(0.98, 0.06, 0.98);
 
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
         const pos = gridToWorld3D(c, r);
-        const tile = new THREE.Mesh(tileGeo, (r + c) % 2 === 0 ? lightTileMat : sageTileMat);
+        const tile = new THREE.Mesh(tileGeo, (r + c) % 2 === 0 ? floorMats.tileA : floorMats.tileB);
         tile.position.set(pos.x, -0.01, pos.z);
         tile.receiveShadow = true;
         kitchenGroup.add(tile);
       }
     }
 
-    buildBistroRoomEnvironment(kitchenGroup, textures);
+    venueAnim = buildVenueEnvironment(venueId, kitchenGroup, textures, buildBistroRoomEnvironment);
 
     for (const st of stations) {
       const node = buildStationNode(st, textures);
@@ -174,6 +176,19 @@ export function createKitchen3D(canvas, state) {
   function syncState(simState, time) {
     hearthLight.intensity = 2.6 + Math.sin(time * 10.5) * 0.45;
     dinerCandleLight.intensity = 1.85 + Math.sin(time * 7.2) * 0.25;
+
+    // Animate venue atmosphere (ocean waves, coastal palms, swaying market lanterns)
+    for (const w of venueAnim.waves) {
+      w.mesh.position.x = w.baseX + Math.sin(time * 1.4 + w.phase) * 0.55;
+      w.mesh.position.y = w.baseY + Math.sin(time * 2.3 + w.phase) * 0.03;
+    }
+    for (const p of venueAnim.palms) {
+      p.crown.rotation.z = Math.sin(time * 1.6 + p.phase) * 0.07;
+      p.crown.rotation.x = Math.cos(time * 1.2 + p.phase) * 0.04;
+    }
+    for (const l of venueAnim.lanterns) {
+      l.mesh.rotation.z = Math.sin(time * 2.1 + l.phase) * 0.085;
+    }
 
     // Apply live Chef Customization to Marco's 3D rig
     if (simState.activeCust && chefRigs.marco?.applyStyle) {

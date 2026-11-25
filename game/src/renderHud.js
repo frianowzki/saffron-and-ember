@@ -18,6 +18,7 @@ import { drawRecipeThumbnail } from './renderFood.js';
 import { UPGRADES } from './upgrades.js';
 import { BOT_MODES } from './botAI.js';
 import { getContextualHint } from './guide.js';
+import { getVenueById } from './venues3d.js';
 
 export function renderHud(ctx, state, time) {
   if (state.scene3d) {
@@ -286,6 +287,27 @@ function drawBottomLeftClockAndTips(ctx, state, time) {
 
 function drawBottomRightControls(ctx, state) {
   const sy = CANVAS_H - 68;
+  const venue = getVenueById(state.venueId);
+
+  // Live Venue Switcher button [V]
+  const vx = CANVAS_W - 458;
+  state.uiButtons.push({ id: 'cycle_venue', x: vx, y: sy, w: 98, h: 42 });
+  ctx.fillStyle = 'rgba(247, 241, 225, 0.92)';
+  ctx.strokeStyle = venue.accent;
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.roundRect(vx, sy, 98, 42, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#261a12';
+  ctx.font = '700 11px Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(venue.name, vx + 49, sy + 15);
+  ctx.fillStyle = '#735c47';
+  ctx.font = '700 9px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('Key V · Scene', vx + 49, sy + 30);
 
   // Quick Recipe Card button [R]
   const rx = CANVAS_W - 352;
@@ -394,24 +416,55 @@ function drawTitleOverlay(ctx, state) {
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
   const leftX = 64;
+  const venue = getVenueById(state.venueId);
 
-  // Handcrafted bistro masthead
+  // Handcrafted bistro masthead (reflects active 3D venue!)
   ctx.fillStyle = '#e89d42';
   ctx.font = '700 12px "Segoe UI", system-ui, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText('OPEN-FLAME BISTRO KITCHEN', leftX, 118);
+  ctx.fillText(`${venue.name.toUpperCase()} · ${venue.subtitle.toUpperCase()}`, leftX, 102);
 
   ctx.fillStyle = '#fbf5e6';
-  ctx.font = '700 62px Georgia, "Palatino Linotype", serif';
-  ctx.fillText('Saffron', leftX, 180);
+  ctx.font = '700 60px Georgia, "Palatino Linotype", serif';
+  ctx.fillText('Saffron', leftX, 162);
   ctx.fillStyle = '#e89d42';
-  ctx.font = 'italic 700 56px Georgia, "Palatino Linotype", serif';
-  ctx.fillText('& Ember', leftX + 6, 236);
+  ctx.font = 'italic 700 54px Georgia, "Palatino Linotype", serif';
+  ctx.fillText('& Ember', leftX + 6, 214);
 
   ctx.fillStyle = '#dfd0bc';
-  ctx.font = '500 15px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText('Switch between Chef Marco & Sous Chef Sofia.', leftX, 286);
-  ctx.fillText('Chop, sear, wash plates, douse pan fires, and beat the rush.', leftX, 308);
+  ctx.font = '500 13.5px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('Chop, sear, bake, wash plates & command your AI Sous Chef.', leftX, 246);
+
+  // Prominent 3D Venue / Location Selector Pill (Beach, Night Market, Mall, Bistro)
+  const vy = 264;
+  state.uiButtons.push({ id: 'cycle_venue', x: leftX, y: vy, w: 362, h: 42 });
+  ctx.fillStyle = 'rgba(247, 241, 225, 0.94)';
+  ctx.strokeStyle = venue.accent;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.roundRect(leftX, vy, 362, 42, 7);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = venue.accent;
+  ctx.beginPath();
+  ctx.roundRect(leftX + 10, vy + 9, 64, 24, 4);
+  ctx.fill();
+  ctx.fillStyle = '#fff9ed';
+  ctx.font = '800 9.5px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(venue.badge, leftX + 42, vy + 24);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#261a12';
+  ctx.font = '700 14px Georgia, serif';
+  ctx.fillText(venue.name, leftX + 84, vy + 25);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#8f5829';
+  ctx.font = '700 10.5px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('Switch [V]', leftX + 350, vy + 25);
+  ctx.textAlign = 'left';
 
   // Clean vertical shift selector (4 campaign & NG+ Endless Rush tabs!)
   SHIFTS.forEach((sh, i) => {
@@ -513,7 +566,7 @@ function drawTitleOverlay(ctx, state) {
   ctx.textAlign = 'left';
   ctx.fillStyle = '#bfb09c';
   ctx.font = '600 11px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText('WASD/Click · Space Act · F Throw · 1-4 AI Bot Ping · B Bot · H Guide · R Menu', leftX, 668);
+  ctx.fillText('WASD/Click · Space Act · F Throw · V Venue · 1-4 AI Bot · B Bot · H Guide · R Menu', leftX, 668);
 }
 
 function drawPauseOverlay(ctx, state) {
@@ -968,9 +1021,9 @@ function drawStoragePickerOverlay(ctx, state) {
 
 function drawContextualHintBar(ctx, state) {
   const hint = getContextualHint(state);
-  const w = 520;
+  const w = 500;
   const h = 34;
-  const x = (CANVAS_W - w) / 2 - 22;
+  const x = 304;
   const y = CANVAS_H - 54;
 
   ctx.save();
