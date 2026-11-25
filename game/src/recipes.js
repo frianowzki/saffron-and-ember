@@ -1,4 +1,4 @@
-// Ingredient catalog, prep/cooking transformations, and combinatorial recipe matcher.
+// Ingredient catalog (8 fresh ingredients), prep/cooking transformations, and 8 combinatorial bistro recipes.
 
 export const INGREDIENTS = {
   tomato: {
@@ -20,6 +20,16 @@ export const INGREDIENTS = {
     prep: 'chop',
     result: 'minced_herbs',
     rawPlateable: false,
+  },
+  cheese: {
+    id: 'cheese',
+    label: 'Fresh Burrata',
+    short: 'Cheese',
+    color: '#faf4e3',
+    accent: '#e8d7a5',
+    prep: 'none',
+    result: 'cheese',
+    rawPlateable: true,
   },
   steak: {
     id: 'steak',
@@ -76,6 +86,7 @@ export const INGREDIENTS = {
 export const PREPARED = {
   diced_tomato: { id: 'diced_tomato', label: 'Diced Tomato', short: 'Diced Tom', base: 'tomato', method: 'chop' },
   minced_herbs: { id: 'minced_herbs', label: 'Herb Gremolata', short: 'Herbs', base: 'herbs', method: 'chop' },
+  cheese: { id: 'cheese', label: 'Creamy Burrata', short: 'Burrata', base: 'cheese', method: 'none' },
   seared_steak: { id: 'seared_steak', label: 'Seared Ribeye', short: 'Steak', base: 'steak', method: 'grill' },
   seared_salmon: { id: 'seared_salmon', label: 'Crispy Salmon', short: 'Salmon', base: 'salmon', method: 'grill' },
   toasted_flatbread: { id: 'toasted_flatbread', label: 'Char Flatbread', short: 'Bread', base: 'dough', method: 'grill' },
@@ -92,6 +103,15 @@ export const RECIPES = [
     basePrice: 36,
     timeLimit: 48,
     accent: '#d94832',
+  },
+  {
+    id: 'burrata_flatbread',
+    name: 'Burrata Flatbread',
+    shortName: 'Burrata Bread',
+    ingredients: ['toasted_flatbread', 'diced_tomato', 'cheese'],
+    basePrice: 42,
+    timeLimit: 46,
+    accent: '#e0b048',
   },
   {
     id: 'herb_steak',
@@ -128,6 +148,15 @@ export const RECIPES = [
     basePrice: 58,
     timeLimit: 52,
     accent: '#b54626',
+  },
+  {
+    id: 'burrata_pasta',
+    name: 'Burrata Herb Pasta',
+    shortName: 'Burrata Pasta',
+    ingredients: ['simmered_pasta', 'cheese', 'minced_herbs', 'diced_tomato'],
+    basePrice: 64,
+    timeLimit: 56,
+    accent: '#4a9e5c',
   },
   {
     id: 'bouillabaisse',
@@ -171,12 +200,5 @@ export function canAddToPlate(plateIngredients, candidateKey) {
   const nextSet = [...plateIngredients, candidateKey];
   return RECIPES.some((recipe) =>
     nextSet.every((ing) => recipe.ingredients.includes(ing)),
-  );
-}
-
-export function getPossibleRecipes(plateIngredients) {
-  if (!plateIngredients || plateIngredients.length === 0) return [];
-  return RECIPES.filter((recipe) =>
-    plateIngredients.every((ing) => recipe.ingredients.includes(ing)),
   );
 }

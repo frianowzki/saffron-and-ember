@@ -41,8 +41,8 @@ export function createKitchen3D(canvas, state) {
   scene.fog = new THREE.Fog(0x2a1d15, 22, 42);
 
   // Dynamic Overcooked 2 angled 3/4 overhead camera framing the kitchen + dining room edges
-  const camera = new THREE.PerspectiveCamera(36, CANVAS_W / CANVAS_H, 0.5, 65);
-  const baseCamPos = new THREE.Vector3(0, 9.7, 10.3);
+  const camera = new THREE.PerspectiveCamera(35, CANVAS_W / CANVAS_H, 0.5, 65);
+  const baseCamPos = new THREE.Vector3(0, 9.25, 9.8);
   const baseLookAt = new THREE.Vector3(0, 0.15, -0.35);
   camera.position.copy(baseCamPos);
   camera.lookAt(baseLookAt);
@@ -70,9 +70,14 @@ export function createKitchen3D(canvas, state) {
   hearthLight.position.set(-3.0, 1.5, 3.0);
   scene.add(hearthLight);
 
-  const passLight = new THREE.PointLight(0xffd26b, 2.5, 7.5);
+  const passLight = new THREE.PointLight(0xffd26b, 2.8, 8.0);
   passLight.position.set(5.4, 2.4, -2.0);
   scene.add(passLight);
+
+  // Warm flickering candlelight over the bistro dining room tables
+  const dinerCandleLight = new THREE.PointLight(0xffb84d, 2.0, 6.5);
+  dinerCandleLight.position.set(7.6, 1.4, 0);
+  scene.add(dinerCandleLight);
 
   const textures = createKitchenTextures();
   const kitchenGroup = new THREE.Group();
@@ -168,6 +173,16 @@ export function createKitchen3D(canvas, state) {
 
   function syncState(simState, time) {
     hearthLight.intensity = 2.6 + Math.sin(time * 10.5) * 0.45;
+    dinerCandleLight.intensity = 1.85 + Math.sin(time * 7.2) * 0.25;
+
+    // Apply live Chef Customization to Marco's 3D rig
+    if (simState.activeCust && chefRigs.marco?.applyStyle) {
+      chefRigs.marco.applyStyle(
+        simState.activeCust.hat.id,
+        simState.activeCust.color.scarf,
+        simState.activeCust.color.apron,
+      );
+    }
 
     if (simState.mode === 'title') {
       camera.position.set(Math.sin(time * 0.35) * 1.1, 9.1, 9.9 + Math.cos(time * 0.35) * 0.35);
@@ -418,11 +433,12 @@ function buildBistroRoomEnvironment(group, textures) {
   backWall.receiveShadow = true;
   group.add(backWall);
 
+  // Hand-painted Mediterranean Azulejo ceramic tile backsplash along lower back wall
   const brickBase = new THREE.Mesh(
-    new THREE.BoxGeometry(GRID_COLS + 0.92, 1.18, 0.26),
-    new THREE.MeshStandardMaterial({ map: textures.brick, roughness: 0.88 }),
+    new THREE.BoxGeometry(GRID_COLS + 0.92, 1.32, 0.26),
+    new THREE.MeshStandardMaterial({ map: textures.azulejo, roughness: 0.36 }),
   );
-  brickBase.position.set(0, 0.59, wallZ + 0.01);
+  brickBase.position.set(0, 0.72, wallZ + 0.01);
   brickBase.receiveShadow = true;
   group.add(brickBase);
 
@@ -525,7 +541,14 @@ function buildBistroRoomEnvironment(group, textures) {
     group.add(stem);
   }
 
-  // Glowing Brass Pendant Heat Lamps over East Pass Window
+  // Glowing Brass Pendant Heat Lamps with soft volumetric light cones over East Pass Window
+  const coneMat = new THREE.MeshBasicMaterial({
+    color: 0xffdf8a,
+    transparent: true,
+    opacity: 0.11,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
   for (const lz of [-2.8, -1.8]) {
     const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 6), new THREE.MeshStandardMaterial({ color: 0x1c1816 }));
     cord.position.set(5.45, 2.8, lz);
@@ -536,6 +559,22 @@ function buildBistroRoomEnvironment(group, textures) {
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe49c }));
     bulb.position.set(5.45, 2.06, lz);
     group.add(bulb);
+    const lightCone = new THREE.Mesh(new THREE.ConeGeometry(0.95, 1.55, 18, 1, true), coneMat);
+    lightCone.position.set(5.45, 1.32, lz);
+    group.add(lightCone);
+  }
+
+  // Hanging Mediterranean garlic braid & red chili ristra on back wall
+  const garlicMat = new THREE.MeshStandardMaterial({ color: 0xf7eed8, roughness: 0.5 });
+  const chiliMat = new THREE.MeshStandardMaterial({ color: 0xcc2b1f, roughness: 0.35 });
+  for (let i = 0; i < 4; i++) {
+    const gBulb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), garlicMat);
+    gBulb.position.set(-5.25 + (i % 2) * 0.06, 2.05 - i * 0.14, wallZ + 0.18);
+    group.add(gBulb);
+    const chili = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.18, 6), chiliMat);
+    chili.rotation.x = Math.PI;
+    chili.position.set(-4.85 + (i % 2) * 0.05, 2.05 - i * 0.13, wallZ + 0.18);
+    group.add(chili);
   }
 
   // Bistro Dining Room Tables with chairs, wine glasses, candles & seated 3D diners!

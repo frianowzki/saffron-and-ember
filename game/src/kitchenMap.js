@@ -2,7 +2,7 @@
 
 import { GRID_COLS, GRID_ROWS, KITCHEN_ORIGIN_X, KITCHEN_ORIGIN_Y, TILE_SIZE } from './config.js';
 
-export function createKitchenStations() {
+export function createKitchenStations(layoutIndex = 1, extraPlates = 0) {
   const stations = [];
   const add = (col, row, type, extra = {}) => {
     stations.push({
@@ -17,7 +17,7 @@ export function createKitchenStations() {
       burnt: false,
       onFire: false,
       fireProgress: 0,
-      plateCount: type === 'plates' ? 4 : 0,
+      plateCount: type === 'plates' ? 4 + extraPlates : 0,
       dirtyCount: 0,
       washProgress: 0,
       ...extra,
@@ -35,7 +35,7 @@ export function createKitchenStations() {
   add(7, 0, 'crate', { ingredientId: 'pasta', label: 'Pasta' });
   add(8, 0, 'pot', { label: 'Copper Pot' });
   add(9, 0, 'counter', { surface: 'marble', label: 'Plating Marble' });
-  add(10, 0, 'plates', { label: 'Clean Plates', plateCount: 4 });
+  add(10, 0, 'plates', { label: 'Clean Plates', plateCount: 4 + extraPlates });
   add(11, 0, 'pass', { label: 'Brass Pass' });
 
   // East wall (col 11): Dual brass pass window, dirty plate return, ceramic wash sink & bin
@@ -46,10 +46,10 @@ export function createKitchenStations() {
   add(11, 5, 'counter', { surface: 'marble', label: 'Drying Rack' });
   add(11, 6, 'bin', { label: 'Compost Bin' });
 
-  // West wall (col 0): Cold larder, butcher block, fire extinguisher & compost bin
+  // West wall (col 0): Cold larder (steak, salmon, burrata cheese), fire extinguisher & compost bin
   add(0, 1, 'crate', { ingredientId: 'steak', label: 'Ribeye Cut' });
   add(0, 2, 'crate', { ingredientId: 'salmon', label: 'Wild Salmon' });
-  add(0, 3, 'counter', { surface: 'oak', label: 'Butcher Block' });
+  add(0, 3, 'crate', { ingredientId: 'cheese', label: 'Fresh Burrata' });
   add(0, 4, 'extinguisher', { label: 'Fire Extinguisher' });
   add(0, 5, 'bin', { label: 'Compost Bin' });
   add(0, 6, 'counter', { surface: 'oak', label: 'Spice Shelf' });
@@ -66,11 +66,24 @@ export function createKitchenStations() {
   add(9, 6, 'counter', { surface: 'oak', label: 'Pass Bench' });
   add(10, 6, 'counter', { surface: 'oak', label: 'Tray Bench' });
 
-  // Central Marble Island (row 3, cols 4..7): dual-lane routing hub for assembly
-  add(4, 3, 'counter', { surface: 'marble', label: 'Island Marble' });
-  add(5, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
-  add(6, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
-  add(7, 3, 'counter', { surface: 'marble', label: 'Island Marble' });
+  // Shift-specific central island layouts for distinct route planning!
+  if (layoutIndex === 0) {
+    // Lunch Courtyard: wide open compact 2-tile marble island
+    add(5, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
+    add(6, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
+  } else if (layoutIndex === 2) {
+    // Grand Tasting: split dual-galley islands with center pass-through lane (ideal for Throwing!)
+    add(3, 3, 'counter', { surface: 'marble', label: 'West Island' });
+    add(4, 3, 'counter', { surface: 'marble', label: 'West Assembly' });
+    add(7, 3, 'counter', { surface: 'marble', label: 'East Assembly' });
+    add(8, 3, 'counter', { surface: 'marble', label: 'East Island' });
+  } else {
+    // Twilight Hearth: classic 4-tile central marble island
+    add(4, 3, 'counter', { surface: 'marble', label: 'Island Marble' });
+    add(5, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
+    add(6, 3, 'counter', { surface: 'marble', label: 'Island Assembly' });
+    add(7, 3, 'counter', { surface: 'marble', label: 'Island Marble' });
+  }
 
   return stations;
 }

@@ -59,16 +59,19 @@ export function buildFoodMesh(item) {
 
   if (item.kind === 'plate') {
     buildPlateMesh(root, item);
+    root.scale.setScalar(1.16);
     return root;
   }
 
   if (item.kind === 'raw') {
     buildRawMesh(root, item.id);
+    root.scale.setScalar(1.15);
     return root;
   }
 
   if (item.kind === 'prepared') {
     buildPreparedMesh(root, item.id, item.perfect);
+    root.scale.setScalar(1.16);
     return root;
   }
 
@@ -159,6 +162,18 @@ export function buildRawMesh(group, id) {
         ring.castShadow = true;
         group.add(ring);
       }
+      break;
+    }
+
+    case 'cheese': {
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), getMat(0xfdf9ee, 0.25));
+      ball.scale.set(1.12, 0.72, 1.12);
+      ball.position.y = 0.14;
+      ball.castShadow = true;
+      group.add(ball);
+      const oil = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.02, 12), getMat(0xe8c448, 0.18));
+      oil.position.y = 0.28;
+      group.add(oil);
       break;
     }
 
@@ -277,6 +292,15 @@ export function buildPreparedMesh(group, id, isPerfect = false) {
       break;
     }
 
+    case 'cheese': {
+      const burrata = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10), getMat(0xfdfaf0, 0.22));
+      burrata.scale.set(1.15, 0.65, 1.15);
+      burrata.position.y = 0.09;
+      burrata.castShadow = true;
+      group.add(burrata);
+      break;
+    }
+
     case 'saffron': {
       const pool = new THREE.Mesh(
         new THREE.CylinderGeometry(0.22, 0.22, 0.03, 14),
@@ -325,9 +349,18 @@ function buildPlateMesh(root, plate) {
   for (const key of list) {
     const layer = new THREE.Group();
     buildPreparedMesh(layer, key, plate.perfectSear);
-    layer.scale.setScalar(key === 'saffron' ? 1.05 : 0.85);
+    layer.scale.setScalar(key === 'saffron' ? 1.08 : 0.88);
     layer.position.y = yOffset;
     root.add(layer);
     yOffset += key === 'saffron' ? 0.02 : 0.075;
+  }
+
+  // Fresh emerald basil leaf garnish crowning every finished gourmet dish!
+  if (isComplete) {
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.085, 8, 6), getMat(0x3ba852, 0.45));
+    leaf.scale.set(1.4, 0.25, 0.7);
+    leaf.position.set(0.06, yOffset + 0.04, 0.02);
+    leaf.rotation.y = 0.5;
+    root.add(leaf);
   }
 }

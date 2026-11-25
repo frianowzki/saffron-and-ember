@@ -425,6 +425,10 @@ export function updateCookingStations(state, dt) {
   // Update Overcooked-2 style thrown 3D ingredients in parabolic flight!
   updateThrownItems(state, dt);
 
+  const chopMult = state.upgradeMods?.chopSpeed ?? 1;
+  const cookMult = state.upgradeMods?.cookSpeed ?? 1;
+  const washMult = state.upgradeMods?.washSpeed ?? 1;
+
   for (const st of stations) {
     const pos = tileToWorld(st.col, st.row);
 
@@ -437,7 +441,7 @@ export function updateCookingStations(state, dt) {
       state.input.interactHeld &&
       chef.facingStation === st
     ) {
-      st.progress += dt;
+      st.progress += dt * chopMult;
       chef.chopAnim = 0.16;
       if (Math.random() < dt * 8) {
         const ing = INGREDIENTS[st.item.id];
@@ -461,13 +465,13 @@ export function updateCookingStations(state, dt) {
       chef.facingStation === st
     ) {
       st.isWashing = true;
-      advanceWash(state, st, dt, pos);
+      advanceWash(state, st, dt * washMult, pos);
       chef.chopAnim = 0.16;
     }
 
     // Active grill searing + realistic grease fire if left burning too long
     if (st.type === 'grill' && st.item) {
-      st.cookTime += dt;
+      st.cookTime += dt * (st.cookTime < SEAR_PERFECT_START ? cookMult : 1);
       if (st.cookTime >= SEAR_BURN_TIME && !st.burnt) {
         st.burnt = true;
         addFloatingText(particles, pos.x, pos.y - 24, 'Burnt!', '#ff624d', 15);
@@ -492,7 +496,7 @@ export function updateCookingStations(state, dt) {
 
     // Active copper pot simmering
     if (st.type === 'pot' && st.item) {
-      st.cookTime += dt;
+      st.cookTime += dt * (st.cookTime < SIMMER_DONE_TIME ? cookMult : 1);
       if (st.cookTime >= SIMMER_BURN_TIME && !st.burnt) {
         st.burnt = true;
         addFloatingText(particles, pos.x, pos.y - 24, 'Overboiled!', '#ff624d', 15);

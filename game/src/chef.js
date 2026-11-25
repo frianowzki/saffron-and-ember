@@ -129,7 +129,8 @@ export function updateChef(state, dt) {
     addFlourPuff(particles, chef.x, chef.y + 10);
   }
 
-  const speed = chef.dashTimer > 0 ? CHEF_DASH_SPEED : CHEF_SPEED;
+  const moveBoost = state.upgradeMods?.moveSpeed ?? 1;
+  const speed = (chef.dashTimer > 0 ? CHEF_DASH_SPEED : CHEF_SPEED) * moveBoost;
   const vx = (chef.dashTimer > 0 && len < 0.01 ? chef.facingX : moveX) * speed;
   const vy = (chef.dashTimer > 0 && len < 0.01 ? chef.facingY : moveY) * speed;
 

@@ -179,33 +179,71 @@ export function buildHDChefRig(variant = 'marco') {
     headGroup.add(stacheL, stacheR);
   }
 
-  // Bouncy Multi-Puff Pleated Chef Toque Hat
+  // Customizable 3D Hat slot (supports Pleated Toque, Bistro Beret, Ember Bandana, Master Crown!)
   const toqueGroup = new THREE.Group();
   toqueGroup.position.y = 0.22;
   headGroup.add(toqueGroup);
 
+  const hatVariants = {
+    toque: new THREE.Group(),
+    beret: new THREE.Group(),
+    bandana: new THREE.Group(),
+    crown: new THREE.Group(),
+  };
+
+  // 1. Classic Multi-Puff Pleated Toque
   const toqueBand = new THREE.Mesh(new THREE.CylinderGeometry(0.255, 0.245, 0.17, 20), coatMat);
   toqueBand.position.y = 0.075;
   toqueBand.castShadow = true;
-  toqueGroup.add(toqueBand);
-
   const bandStripe = new THREE.Mesh(new THREE.CylinderGeometry(0.258, 0.254, 0.036, 20), scarfMat);
   bandStripe.position.y = 0.02;
-  toqueGroup.add(bandStripe);
-
   const crown = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), coatMat);
   crown.scale.set(1.06, 0.76, 1.06);
   crown.position.y = 0.25;
   crown.castShadow = true;
-  toqueGroup.add(crown);
-
+  hatVariants.toque.add(toqueBand, bandStripe, crown);
   for (let i = 0; i < 6; i++) {
     const a = (i * Math.PI * 2) / 6;
     const puff = new THREE.Mesh(new THREE.SphereGeometry(0.155, 12, 10), coatMat);
     puff.position.set(Math.cos(a) * 0.145, 0.24, Math.sin(a) * 0.145);
     puff.castShadow = true;
-    toqueGroup.add(puff);
+    hatVariants.toque.add(puff);
   }
+
+  // 2. French Bistro Beret
+  const beretCap = new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 12), scarfMat);
+  beretCap.scale.set(1.12, 0.42, 1.08);
+  beretCap.position.set(0.04, 0.12, -0.02);
+  beretCap.rotation.z = -0.18;
+  beretCap.castShadow = true;
+  const beretStem = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.08, 8), scarfMat);
+  beretStem.position.set(0.06, 0.25, -0.02);
+  hatVariants.beret.add(beretCap, beretStem);
+
+  // 3. Ember Chef Bandana
+  const bandanaWrap = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.26, 0.13, 20), scarfMat);
+  bandanaWrap.position.y = 0.04;
+  bandanaWrap.castShadow = true;
+  const bandanaKnot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), scarfMat);
+  bandanaKnot.position.set(0, 0.05, -0.27);
+  hatVariants.bandana.add(bandanaWrap, bandanaKnot);
+
+  // 4. Master Chef Golden Crown Toque
+  const goldCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.24, 0.19, 8), brassMat);
+  goldCrown.position.y = 0.09;
+  goldCrown.castShadow = true;
+  hatVariants.crown.add(goldCrown);
+  for (let i = 0; i < 5; i++) {
+    const a = (i * Math.PI * 2) / 5;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.14, 6), brassMat);
+    tip.position.set(Math.cos(a) * 0.22, 0.24, Math.sin(a) * 0.22);
+    hatVariants.crown.add(tip);
+  }
+
+  Object.entries(hatVariants).forEach(([k, grp]) => {
+    grp.visible = k === 'toque';
+    toqueGroup.add(grp);
+  });
 
   // Articulated Arms + Hands + Chef Knife
   const makeArm = (side) => {
@@ -248,6 +286,14 @@ export function buildHDChefRig(variant = 'marco') {
   holdSlot.position.set(0, 0.34, 0.49);
   upperBody.add(holdSlot);
 
+  const applyStyle = (hatId, scarfHex, apronHex) => {
+    Object.entries(hatVariants).forEach(([k, grp]) => {
+      grp.visible = k === hatId;
+    });
+    if (scarfHex !== undefined) scarfMat.color.setHex(scarfHex);
+    if (apronHex !== undefined) apronMat.color.setHex(apronHex);
+  };
+
   return {
     root,
     upperBody,
@@ -262,5 +308,6 @@ export function buildHDChefRig(variant = 'marco') {
     handKnife,
     holdSlot,
     activeRing,
+    applyStyle,
   };
 }

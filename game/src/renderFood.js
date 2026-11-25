@@ -227,6 +227,22 @@ export function drawRawIngredient(ctx, id) {
       break;
     }
 
+    case 'cheese': {
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      ctx.ellipse(0, 11, 15, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fdf9ee';
+      ctx.beginPath();
+      ctx.ellipse(0, 1, 15, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(232, 196, 72, 0.65)';
+      ctx.beginPath();
+      ctx.arc(-2, -1, 5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+
     case 'saffron': {
       // Glowing glass apothecary jar of golden saffron glaze
       ctx.fillStyle = 'rgba(0,0,0,0.22)';
@@ -390,6 +406,22 @@ export function drawPreparedIngredient(ctx, id, isPerfect = false) {
       break;
     }
 
+    case 'cheese': {
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      ctx.ellipse(0, 11, 15, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fdf9ee';
+      ctx.beginPath();
+      ctx.ellipse(0, 1, 15, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(232, 196, 72, 0.65)';
+      ctx.beginPath();
+      ctx.arc(-2, -1, 5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+
     case 'saffron': {
       drawRawIngredient(ctx, 'saffron');
       break;
@@ -493,6 +525,32 @@ export function drawPlate(ctx, plate, time = 0) {
 
 export function drawPlatedRecipe(ctx, recipeId) {
   switch (recipeId) {
+    case 'burrata_flatbread': {
+      ctx.save();
+      ctx.scale(0.88, 0.88);
+      drawPreparedIngredient(ctx, 'toasted_flatbread');
+      ctx.translate(0, -1);
+      drawPreparedIngredient(ctx, 'diced_tomato');
+      ctx.fillStyle = '#fdf9ee';
+      ctx.beginPath();
+      ctx.arc(0, -1, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      break;
+    }
+    case 'burrata_pasta': {
+      ctx.save();
+      ctx.scale(0.88, 0.88);
+      drawPreparedIngredient(ctx, 'simmered_pasta');
+      drawPreparedIngredient(ctx, 'diced_tomato');
+      ctx.fillStyle = '#fdf9ee';
+      ctx.beginPath();
+      ctx.arc(0, -1, 7.5, 0, Math.PI * 2);
+      ctx.fill();
+      drawPreparedIngredient(ctx, 'minced_herbs');
+      ctx.restore();
+      break;
+    }
     case 'bruschetta': {
       // Toasted flatbread topped with jewel diced tomatoes & fresh basil drizzle
       ctx.save();

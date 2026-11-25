@@ -15,6 +15,9 @@ import {
 import { INGREDIENTS, PREPARED, RECIPES } from './recipes.js';
 import { getStarRating } from './orders.js';
 import { drawRecipeThumbnail } from './renderFood.js';
+import { UPGRADES } from './upgrades.js';
+import { BOT_MODES } from './botAI.js';
+import { getContextualHint } from './guide.js';
 
 export function renderHud(ctx, state, time) {
   if (state.scene3d) {
@@ -33,8 +36,12 @@ export function renderHud(ctx, state, time) {
 
   if (state.mode === 'playing' || state.mode === 'paused') {
     drawTicketRail(ctx, state, time);
+    drawTopRightSupplyBar(ctx, state);
     drawBottomLeftClockAndTips(ctx, state, time);
     drawBottomRightControls(ctx, state);
+    if (state.showGuide && state.mode === 'playing') {
+      drawContextualHintBar(ctx, state);
+    }
     if (state.showRecipeBook && state.mode === 'playing') {
       drawQuickRecipeCard(ctx, state);
     }
@@ -68,7 +75,7 @@ function drawTicketRail(ctx, state, time) {
 
   state.orders.orders.forEach((order, idx) => {
     const tx = 22 + idx * (ticketW + gap);
-    const ty = 12 - order.slideIn * 28;
+    const ty = 12;
     drawOrderTicket(ctx, order, tx, ty, ticketW, 92, time);
   });
 }
@@ -403,52 +410,107 @@ function drawTitleOverlay(ctx, state) {
   ctx.fillText('Switch between Chef Marco & Sous Chef Sofia.', leftX, 286);
   ctx.fillText('Chop, sear, wash plates, douse pan fires, and beat the rush.', leftX, 308);
 
-  // Clean vertical shift selector (linen paper tabs, no generic dark cards!)
+  // Clean vertical shift selector (4 campaign & NG+ Endless Rush tabs!)
   SHIFTS.forEach((sh, i) => {
-    const sy = 348 + i * 68;
+    const sy = 318 + i * 54;
     const selected = state.selectedShiftIndex === i;
-    state.uiButtons.push({ id: `shift_${i}`, x: leftX, y: sy, w: 350, h: 58 });
+    state.uiButtons.push({ id: `shift_${i}`, x: leftX, y: sy, w: 362, h: 48 });
 
     ctx.fillStyle = selected ? '#f7f1e1' : 'rgba(247, 241, 225, 0.14)';
     ctx.strokeStyle = selected ? '#d4a142' : 'rgba(247, 241, 225, 0.25)';
     ctx.lineWidth = selected ? 2.5 : 1.2;
     ctx.beginPath();
-    ctx.roundRect(leftX, sy, 350, 58, 6);
+    ctx.roundRect(leftX, sy, 362, 48, 6);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = selected ? '#261a12' : '#f7f1e1';
-    ctx.font = '700 17px Georgia, serif';
-    ctx.fillText(sh.name, leftX + 18, sy + 23);
+    ctx.font = '700 15px Georgia, serif';
+    ctx.fillText(sh.name, leftX + 16, sy + 19);
 
     ctx.fillStyle = selected ? '#6e5742' : '#cbb8a1';
-    ctx.font = '600 11.5px "Segoe UI", system-ui, sans-serif';
-    ctx.fillText(`${sh.allowedRecipes.length} dishes · ${Math.floor(sh.durationSec / 60)}:${(sh.durationSec % 60).toString().padStart(2, '0')} shift`, leftX + 18, sy + 43);
+    ctx.font = '600 10.5px "Segoe UI", system-ui, sans-serif';
+    ctx.fillText(`${sh.allowedRecipes.length} dishes · ${Math.floor(sh.durationSec / 60)}:${(sh.durationSec % 60).toString().padStart(2, '0')} shift`, leftX + 16, sy + 36);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = selected ? '#b56a08' : '#e8b85a';
-    ctx.font = '700 12px "Segoe UI", system-ui, sans-serif';
-    ctx.fillText(`Goal $${sh.starThresholds[2]}`, leftX + 332, sy + 32);
+    ctx.font = '700 11.5px "Segoe UI", system-ui, sans-serif';
+    ctx.fillText(`Goal $${sh.starThresholds[2]}`, leftX + 346, sy + 26);
     ctx.textAlign = 'left';
   });
 
-  // Primary brass-gold CTA button
-  const btnY = 574;
-  state.uiButtons.push({ id: 'start_shift', x: leftX, y: btnY, w: 260, h: 54 });
+  // Live 3D Chef Customizer strip (Hat, Outfit Color, Chef Role Perk!)
+  const cust = state.activeCust;
+  if (cust) {
+    const cy = 540;
+    const items = [
+      { id: 'cycle_hat', label: 'Hat', val: cust.hat.name, w: 118 },
+      { id: 'cycle_color', label: 'Outfit', val: cust.color.name, w: 112, dot: cust.color.hex },
+      { id: 'cycle_perk', label: 'Perk', val: cust.perk.name, w: 120 },
+    ];
+    let cx = leftX;
+    for (const item of items) {
+      state.uiButtons.push({ id: item.id, x: cx, y: cy, w: item.w, h: 42 });
+      ctx.fillStyle = 'rgba(247, 241, 225, 0.9)';
+      ctx.strokeStyle = '#c49541';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(cx, cy, item.w, 42, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#7a634d';
+      ctx.font = '700 9px "Segoe UI", system-ui, sans-serif';
+      ctx.fillText(item.label.toUpperCase(), cx + 10, cy + 13);
+
+      if (item.dot) {
+        ctx.fillStyle = item.dot;
+        ctx.beginPath();
+        ctx.arc(cx + 15, cy + 29, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#261a12';
+      ctx.font = '700 11px Georgia, serif';
+      ctx.fillText(item.val, cx + (item.dot ? 25 : 10), cy + 29);
+      cx += item.w + 6;
+    }
+  }
+
+  // Primary brass-gold CTA button + Assist Mode toggle beside it
+  const btnY = 594;
+  state.uiButtons.push({ id: 'start_shift', x: leftX, y: btnY, w: 230, h: 52 });
   ctx.fillStyle = '#d96420';
   ctx.beginPath();
-  ctx.roundRect(leftX, btnY, 260, 54, 7);
+  ctx.roundRect(leftX, btnY, 230, 52, 7);
   ctx.fill();
 
   ctx.fillStyle = '#fff9ed';
-  ctx.font = '700 17px Georgia, serif';
+  ctx.font = '700 16.5px Georgia, serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Start Dinner Service', leftX + 130, btnY + 28);
+  ctx.fillText('Start Dinner Service', leftX + 115, btnY + 27);
+
+  // Assist Mode toggle pill
+  const ax = leftX + 242;
+  state.uiButtons.push({ id: 'toggle_assist', x: ax, y: btnY, w: 120, h: 52 });
+  ctx.fillStyle = state.assistMode ? '#2f7a44' : 'rgba(247, 241, 225, 0.16)';
+  ctx.strokeStyle = state.assistMode ? '#6ee88a' : 'rgba(247, 241, 225, 0.35)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.roundRect(ax, btnY, 120, 52, 7);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#fff9ed';
+  ctx.font = '700 12px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText(state.assistMode ? 'Assist: ON' : 'Assist: OFF', ax + 60, btnY + 20);
+  ctx.fillStyle = '#d9ccb8';
+  ctx.font = '600 9.5px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('Relaxed Timer', ax + 60, btnY + 36);
 
   ctx.textAlign = 'left';
   ctx.fillStyle = '#bfb09c';
-  ctx.font = '600 11.5px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText('WASD / Click · Space Act · F Throw · Shift Dash · Tab Switch Chef', leftX, 654);
+  ctx.font = '600 11px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('WASD/Click · Space Act · F Throw · 1-4 AI Bot Ping · B Bot · H Guide · R Menu', leftX, 668);
 }
 
 function drawPauseOverlay(ctx, state) {
@@ -479,11 +541,11 @@ function drawPauseOverlay(ctx, state) {
 }
 
 function drawSummaryCheckPresenter(ctx, state) {
-  ctx.fillStyle = 'rgba(18, 12, 8, 0.55)';
+  ctx.fillStyle = 'rgba(18, 12, 8, 0.56)';
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-  // Walnut check-presenter board
-  const bw = 460;
+  // Two-column walnut presentation board: Left = Nightly Ledger, Right = Kitchen Upgrade Shop!
+  const bw = 820;
   const bh = 490;
   const bx = (CANVAS_W - bw) / 2;
   const by = (CANVAS_H - bh) / 2 + 12;
@@ -497,10 +559,10 @@ function drawSummaryCheckPresenter(ctx, state) {
   ctx.fill();
   ctx.shadowColor = 'transparent';
 
-  // Cream linen bistro receipt slip pinned on the wooden board
-  const rx = bx + 24;
+  // Left cream linen bistro receipt slip
+  const rx = bx + 22;
   const ry = by + 22;
-  const rw = bw - 48;
+  const rw = 376;
   const rh = bh - 44;
   ctx.fillStyle = '#faf4e6';
   ctx.beginPath();
@@ -510,26 +572,24 @@ function drawSummaryCheckPresenter(ctx, state) {
   // Brass clip at top of receipt
   ctx.fillStyle = '#d4a142';
   ctx.beginPath();
-  ctx.roundRect(CANVAS_W / 2 - 44, by + 10, 88, 22, 4);
+  ctx.roundRect(rx + rw / 2 - 42, by + 10, 84, 20, 4);
   ctx.fill();
 
   const stars = getStarRating(state.shift, state.orders.score);
 
   ctx.fillStyle = '#8f5829';
-  ctx.font = '700 11px "Segoe UI", system-ui, sans-serif';
+  ctx.font = '700 10.5px "Segoe UI", system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(`SAFFRON & EMBER · ${state.shift.name.toUpperCase()}`, CANVAS_W / 2, ry + 34);
+  ctx.fillText(`SAFFRON & EMBER · ${state.shift.name.toUpperCase()}`, rx + rw / 2, ry + 32);
 
   ctx.fillStyle = '#261a12';
-  ctx.font = '700 32px Georgia, serif';
-  ctx.fillText('Nightly Ledger', CANVAS_W / 2, ry + 70);
+  ctx.font = '700 30px Georgia, serif';
+  ctx.fillText('Nightly Ledger', rx + rw / 2, ry + 66);
 
-  // Embossed wax-gold stars
   for (let i = 0; i < 3; i++) {
-    drawVectorStar(ctx, CANVAS_W / 2 - 48 + i * 48, ry + 114, 16, i < stars ? '#d98a16' : '#dfd5c2');
+    drawVectorStar(ctx, rx + rw / 2 - 46 + i * 46, ry + 108, 15, i < stars ? '#d98a16' : '#dfd5c2');
   }
 
-  // Receipt line items
   const rows = [
     ['Dishes Served', `${state.orders.servedCount}`],
     ['Perfect Sears', `${state.orders.perfectCount}`],
@@ -541,43 +601,95 @@ function drawSummaryCheckPresenter(ctx, state) {
   ctx.strokeStyle = '#d8ccb6';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(rx + 28, ry + 146);
-  ctx.lineTo(rx + rw - 28, ry + 146);
+  ctx.moveTo(rx + 24, ry + 138);
+  ctx.lineTo(rx + rw - 24, ry + 138);
   ctx.stroke();
 
   rows.forEach(([label, val], idx) => {
-    const ly = ry + 174 + idx * 32;
+    const ly = ry + 166 + idx * 31;
     ctx.fillStyle = '#5c4836';
-    ctx.font = '600 13.5px "Segoe UI", system-ui, sans-serif';
+    ctx.font = '600 13px "Segoe UI", system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(label, rx + 32, ly);
+    ctx.fillText(label, rx + 26, ly);
 
     ctx.fillStyle = '#261a12';
-    ctx.font = '700 14px "Segoe UI", system-ui, sans-serif';
+    ctx.font = '700 13.5px "Segoe UI", system-ui, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(val, rx + rw - 32, ly);
+    ctx.fillText(val, rx + rw - 26, ly);
   });
 
-  // Total line
   ctx.strokeStyle = '#261a12';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(rx + 28, ry + 336);
-  ctx.lineTo(rx + rw - 28, ry + 336);
+  ctx.moveTo(rx + 24, ry + 328);
+  ctx.lineTo(rx + rw - 24, ry + 328);
   ctx.stroke();
 
   ctx.fillStyle = '#261a12';
-  ctx.font = '700 18px Georgia, serif';
+  ctx.font = '700 16px Georgia, serif';
   ctx.textAlign = 'left';
-  ctx.fillText('TOTAL REVENUE', rx + 32, ry + 362);
+  ctx.fillText('SHIFT REVENUE', rx + 26, ry + 356);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#b55214';
-  ctx.font = '800 24px Georgia, serif';
-  ctx.fillText(`$${state.orders.score}`, rx + rw - 32, ry + 362);
+  ctx.font = '800 23px Georgia, serif';
+  ctx.fillText(`$${state.orders.score}`, rx + rw - 26, ry + 356);
 
   const hasNext = state.selectedShiftIndex < SHIFTS.length - 1;
-  drawPaperButton(ctx, state, 'restart', rx + 24, ry + 392, 174, 40, 'Replay Shift', false);
-  drawPaperButton(ctx, state, hasNext ? 'next_shift' : 'to_title', rx + 214, ry + 392, 174, 40, hasNext ? 'Next Shift' : 'Shift Select', true);
+  drawPaperButton(ctx, state, 'restart', rx + 20, ry + 390, 160, 40, 'Replay Shift', false);
+  drawPaperButton(ctx, state, hasNext ? 'next_shift' : 'to_title', rx + 196, ry + 390, 160, 40, hasNext ? 'Next Shift' : 'Shift Select', true);
+
+  // Right Panel: Kitchen Upgrades Catalog (spend earned wallet!)
+  const ux = rx + rw + 22;
+  const uw = 378;
+  ctx.fillStyle = '#f5eedf';
+  ctx.beginPath();
+  ctx.roundRect(ux, ry, uw, rh, 4);
+  ctx.fill();
+
+  ctx.fillStyle = '#8f5829';
+  ctx.font = '700 10.5px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('BISTRO EQUIPMENT CATALOG', ux + 22, ry + 30);
+
+  ctx.fillStyle = '#261a12';
+  ctx.font = '700 24px Georgia, serif';
+  ctx.fillText('Kitchen Upgrades', ux + 22, ry + 60);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#2f7a44';
+  ctx.font = '800 15px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText(`Funds: $${state.upgrades.wallet}`, ux + uw - 22, ry + 58);
+
+  UPGRADES.forEach((up, idx) => {
+    const uy = ry + 86 + idx * 66;
+    const owned = state.upgrades.owned.has(up.id);
+    const canAfford = state.upgrades.wallet >= up.cost;
+    if (!owned) {
+      state.uiButtons.push({ id: `buy_${up.id}`, x: ux + 20, y: uy, w: uw - 40, h: 56 });
+    }
+
+    ctx.fillStyle = owned ? '#e3eedf' : '#ebe2ce';
+    ctx.strokeStyle = owned ? '#3b8c52' : canAfford ? '#c49541' : '#d6cab4';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.roundRect(ux + 20, uy, uw - 40, 56, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#261a12';
+    ctx.font = '700 14px Georgia, serif';
+    ctx.fillText(up.name, ux + 34, uy + 21);
+
+    ctx.fillStyle = '#634d39';
+    ctx.font = '600 11.5px "Segoe UI", system-ui, sans-serif';
+    ctx.fillText(up.desc, ux + 34, uy + 40);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = owned ? '#2f7a44' : canAfford ? '#b55214' : '#9c8c78';
+    ctx.font = '800 13px "Segoe UI", system-ui, sans-serif';
+    ctx.fillText(owned ? 'EQUIPPED' : `$${up.cost}`, ux + uw - 34, uy + 30);
+  });
 
   ctx.restore();
 }
@@ -700,6 +812,114 @@ function drawWorldOverlays3D(ctx, state, time) {
     ctx.fillText(t.text, p.x, p.y);
     ctx.restore();
   }
+
+  // Live AI Sous Chef task badge floating above the AI-controlled chef
+  if (state.mode === 'playing' && state.bot?.enabled) {
+    const aiChef = state.chefs.find((c) => c !== state.chef);
+    if (aiChef) {
+      const p = state.scene3d.projectSimPos(aiChef.x, aiChef.y, 1.78);
+      drawWorldPill(
+        ctx,
+        p.x,
+        p.y,
+        `AI ${aiChef.name.toUpperCase()} · ${state.bot.taskLabel.toUpperCase()}`,
+        'rgba(34, 82, 54, 0.9)',
+        '#e8ffef',
+      );
+    }
+  }
+}
+
+function drawTopRightSupplyBar(ctx, state) {
+  const platesSt = state.stations.find((s) => s.type === 'plates');
+  const cleanCount = platesSt ? platesSt.plateCount : 0;
+  const dirtyCount = state.stations.reduce((sum, s) => sum + (s.dirtyCount || 0), 0);
+  const botInfo = BOT_MODES[state.bot?.mode ?? 'auto'];
+
+  const barW = 296;
+  const x = CANVAS_W - barW - 16;
+  const y = 12;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(247, 241, 225, 0.92)';
+  ctx.strokeStyle = 'rgba(212, 161, 66, 0.72)';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.roundRect(x, y, barW, 44, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  // Clean Plates vector icon + count
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = cleanCount > 0 ? '#3b8c52' : '#c93226';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x + 22, y + 22, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#261a12';
+  ctx.font = '800 13px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText(`${cleanCount}`, x + 37, y + 17);
+  ctx.fillStyle = '#735c47';
+  ctx.font = '700 8.5px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('PLATES', x + 37, y + 30);
+
+  // Dirty Plates icon + count
+  ctx.fillStyle = '#cfc2ae';
+  ctx.strokeStyle = dirtyCount > 0 ? '#b56a08' : '#a89c8a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x + 92, y + 22, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = dirtyCount > 0 ? '#b55214' : '#261a12';
+  ctx.font = '800 13px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText(`${dirtyCount}`, x + 107, y + 17);
+  ctx.fillStyle = '#735c47';
+  ctx.font = '700 8.5px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('DIRTY', x + 107, y + 30);
+
+  // Interactive AI Sous Chef Mode pill [B / 1-4]
+  const bx = x + 152;
+  state.uiButtons.push({ id: 'toggle_bot', x: bx, y: y + 6, w: 136, h: 32 });
+  ctx.fillStyle = state.bot?.enabled ? '#2f7a44' : '#5e5044';
+  ctx.beginPath();
+  ctx.roundRect(bx, y + 6, 136, 32, 6);
+  ctx.fill();
+
+  ctx.fillStyle = '#fff9ed';
+  ctx.font = '700 10.5px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(state.bot?.enabled ? `${botInfo.label} [1-4]` : 'AI Bot: OFF [B]', bx + 68, y + 22);
+  ctx.restore();
+}
+
+function drawContextualHintBar(ctx, state) {
+  const hint = getContextualHint(state);
+  const w = 520;
+  const h = 34;
+  const x = (CANVAS_W - w) / 2 - 22;
+  const y = CANVAS_H - 54;
+
+  ctx.save();
+  ctx.fillStyle = hint.urgent ? 'rgba(184, 42, 32, 0.94)' : 'rgba(30, 20, 14, 0.88)';
+  ctx.strokeStyle = hint.urgent ? '#ffe066' : 'rgba(212, 161, 66, 0.65)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = hint.urgent ? '#fff9ed' : '#f5e6cc';
+  ctx.font = '600 11.5px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(hint.text, x + w / 2, y + h / 2 + 0.5);
+  ctx.restore();
 }
 
 function drawWorldBar(ctx, cx, y, ratio, fillColor, sweetSpot) {

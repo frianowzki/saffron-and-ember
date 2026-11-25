@@ -49,6 +49,18 @@ export function createInputController(canvas, state, callbacks) {
       if (state.mode === 'playing') state.showRecipeBook = !state.showRecipeBook;
       return;
     }
+    if (code === 'KeyH') {
+      if (state.mode === 'playing') state.showGuide = !state.showGuide;
+      return;
+    }
+    if (code === 'KeyB') {
+      if (state.mode === 'playing') callbacks.toggleBot();
+      return;
+    }
+    if (code === 'Digit1') { callbacks.setBotMode('auto'); return; }
+    if (code === 'Digit2') { callbacks.setBotMode('prep'); return; }
+    if (code === 'Digit3') { callbacks.setBotMode('wash'); return; }
+    if (code === 'Digit4') { callbacks.setBotMode('grill'); return; }
     if (code === 'KeyK') {
       if (state.mode === 'playing') callbacks.toggleCoop();
       return;

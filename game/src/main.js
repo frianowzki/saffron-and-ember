@@ -19,6 +19,9 @@ import {
 import { renderHud } from './renderHud.js';
 import { renderKitchen } from './renderKitchen.js';
 import { createKitchen3D } from './scene3d.js';
+import { buyUpgrade, createUpgradeState, getUpgradeModifiers } from './upgrades.js';
+import { createBotController, updateBotChef } from './botAI.js';
+import { createCustomizationState, getActiveCustomization } from './customization.js';
 
 const sceneCanvas = document.getElementById('scene-canvas');
 const hudCanvas = document.getElementById('hud-canvas');
@@ -42,7 +45,14 @@ const state = {
   pendingDirtyReturns: [],
   thrownItems: [],
   showRecipeBook: false,
+  showGuide: true,
+  assistMode: false,
   coopEnabled: false,
+  bot: createBotController(),
+  customization: createCustomizationState(),
+  activeCust: getActiveCustomization(createCustomizationState()),
+  upgrades: createUpgradeState(),
+  upgradeMods: getUpgradeModifiers(null),
   orders: createOrderManager(SHIFTS[1]),
   particles: createParticleSystem(),
   audio,
@@ -58,7 +68,15 @@ function setupKitchen(shiftIndex) {
   state.selectedShiftIndex = shiftIndex;
   state.shift = SHIFTS[shiftIndex];
   state.timeLeft = state.shift.durationSec;
-  state.stations = createKitchenStations();
+  const baseMods = getUpgradeModifiers(state.upgrades);
+  state.activeCust = getActiveCustomization(state.customization);
+  state.upgradeMods = {
+    ...baseMods,
+    chopSpeed: baseMods.chopSpeed + state.activeCust.perk.chopBonus,
+    cookSpeed: baseMods.cookSpeed + state.activeCust.perk.cookBonus,
+    moveSpeed: baseMods.moveSpeed + state.activeCust.perk.speedBonus,
+  };
+  state.stations = createKitchenStations(state.shift.layoutIndex ?? 1, state.upgradeMods.extraPlates);
   state.grid = buildStationGrid(state.stations);
   state.chefs = [
     createChef(4, 2, 'Marco', 'marco'),
@@ -117,6 +135,34 @@ function handleButton(id) {
     audio.playPickup();
     return;
   }
+  if (id === 'toggle_bot') {
+    state.bot.enabled = !state.bot.enabled;
+    audio.playPickup();
+    return;
+  }
+  if (id === 'toggle_assist') {
+    state.assistMode = !state.assistMode;
+    audio.playPickup();
+    return;
+  }
+  if (id === 'cycle_hat') {
+    state.customization.hatIndex += 1;
+    state.activeCust = getActiveCustomization(state.customization);
+    audio.playPickup();
+    return;
+  }
+  if (id === 'cycle_color') {
+    state.customization.colorIndex += 1;
+    state.activeCust = getActiveCustomization(state.customization);
+    audio.playPickup();
+    return;
+  }
+  if (id === 'cycle_perk') {
+    state.customization.perkIndex += 1;
+    state.activeCust = getActiveCustomization(state.customization);
+    audio.playPickup();
+    return;
+  }
   if (id === 'mute') {
     audio.toggleMute();
     return;
@@ -138,6 +184,14 @@ function handleButton(id) {
     startShift(Math.min(SHIFTS.length - 1, state.selectedShiftIndex + 1));
     return;
   }
+  if (id.startsWith('buy_')) {
+    const upId = id.slice(4);
+    if (buyUpgrade(state.upgrades, upId)) {
+      state.upgradeMods = getUpgradeModifiers(state.upgrades);
+      audio.playServeBell(2);
+    }
+    return;
+  }
   if (id === 'to_title') {
     setupKitchen(state.selectedShiftIndex);
     state.mode = 'title';
@@ -148,6 +202,15 @@ const inputController = createInputController(hudCanvas, state, {
   startShift,
   handleButton,
   switchChef,
+  toggleBot: () => {
+    state.bot.enabled = !state.bot.enabled;
+    audio.playPickup();
+  },
+  setBotMode: (mode) => {
+    state.bot.enabled = true;
+    state.bot.mode = mode;
+    audio.playPickup();
+  },
   toggleCoop: () => { state.coopEnabled = !state.coopEnabled; },
 });
 state.input = inputController.state;
@@ -278,8 +341,23 @@ function applyQueryPreset() {
     at(4, 6).onFire = true; // Active pan fire hazard!
     at(6, 6).item = { kind: 'raw', id: 'pasta' };
     at(6, 6).cookTime = 3.9;
-    at(5, 3).item = makePlate(['simmered_pasta', 'diced_tomato', 'saffron'], false);
+    at(3, 3).item = makePlate(['simmered_pasta', 'diced_tomato', 'saffron'], false);
     at(7, 3).item = makePlate(['toasted_flatbread', 'seared_steak', 'diced_tomato'], true);
+
+    // Mid-air 3D thrown tomato tossed across the split-galley kitchen!
+    const tFrom = tileToWorld(2, 1);
+    const tTo = tileToWorld(7, 3);
+    state.thrownItems.push({
+      item: { kind: 'raw', id: 'tomato' },
+      startX: tFrom.x,
+      startY: tFrom.y,
+      targetX: tTo.x,
+      targetY: tTo.y,
+      x: (tFrom.x + tTo.x) * 0.5,
+      y: (tFrom.y + tTo.y) * 0.5,
+      t: 0.48,
+      duration: 0.36,
+    });
 
     const marcoPos = tileToWorld(3, 5);
     state.chefs[0].x = marcoPos.x;
@@ -312,6 +390,9 @@ function applyQueryPreset() {
     state.orders.perfectCount = 8;
     state.orders.bestCombo = 6;
     state.orders.expiredCount = 1;
+    state.upgrades.wallet = 464;
+    state.upgrades.owned.add('damascus_knife');
+    state.upgrades.owned.add('turbo_burners');
   }
 }
 
@@ -329,11 +410,13 @@ function tick(now) {
   if (state.mode === 'playing') {
     state.timeLeft = Math.max(0, state.timeLeft - dt);
     updateChef(state, dt);
+    updateBotChef(state, dt);
     updateCookingStations(state, dt);
-    updateOrders(state.orders, dt, state.timeLeft, audio, state.particles);
+    updateOrders(state.orders, dt, state.timeLeft, audio, state.particles, state.assistMode);
     audio.updateMusic(dt, true, state.orders.rushActive);
     if (state.timeLeft <= 0) {
       state.mode = 'summary';
+      state.upgrades.wallet += state.orders.score;
       audio.playShiftComplete();
     }
   } else {

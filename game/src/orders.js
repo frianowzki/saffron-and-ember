@@ -47,7 +47,7 @@ export function spawnOrder(mgr, forcedRecipeId = null, forcedVip = null) {
   return ticket;
 }
 
-export function updateOrders(mgr, dt, shiftTimeLeft, audio, particles) {
+export function updateOrders(mgr, dt, shiftTimeLeft, audio, particles, assistMode = false) {
   const elapsed = mgr.shift.durationSec - shiftTimeLeft;
   mgr.rushActive = shiftTimeLeft <= mgr.shift.rushStartSec && shiftTimeLeft > 0;
 
@@ -62,11 +62,12 @@ export function updateOrders(mgr, dt, shiftTimeLeft, audio, particles) {
     mgr.spawnTimer = mgr.orders.length < 2 ? 2.4 : activeInterval;
   }
 
+  const timeRate = assistMode ? 0.62 : 1.0;
   let anyUrgent = false;
   for (let i = mgr.orders.length - 1; i >= 0; i--) {
     const order = mgr.orders[i];
     order.slideIn = Math.max(0, order.slideIn - dt * 4.5);
-    order.timeLeft -= dt;
+    order.timeLeft -= dt * timeRate;
     const ratio = order.timeLeft / order.timeLimit;
     if (ratio < 0.25 && ratio > 0) {
       anyUrgent = true;
